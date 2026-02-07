@@ -64,80 +64,251 @@ There are three viable execution models:
 
 **Experiment 0.2:** Spawn `claude --print` as a child process, capture stdout in real-time, and attempt to extract structured events. Measure: what information is lost vs. SDK embedding.
 
-### 0.2 — Agent SDK Landscape
+### 0.2 — Claude Agent SDK Deep Dive (Primary Execution Layer)
 
-#### Claude Agent SDK
+> **Decision:** Focus on Claude Agent SDK as the sole execution layer for v1. OpenAI can be added later behind the same normalization interface.
 
-- **What:** Anthropic's SDK for building agentic applications — the same tools, agent loop, and context management that power Claude Code, programmable in Python and TypeScript.
-- **Runtime model:** You provide tools (or use built-in ones), Claude decides when to call them. Supports streaming of both text and tool-use events.
-- **Core client:** `ClaudeSDKClient` — supports `connect()`, `query()`, `receive_messages()`, `receive_response()`, `interrupt()`, `rewind_files()`, `disconnect()`. Fully interactive, session-resumable.
-- **Streaming:** Set `include_partial_messages=True` to receive `StreamEvent` messages with raw API events as they arrive. Look for `content_block_delta` events where `delta.type` is `text_delta` for incremental text, and `ToolUseBlock`/`ToolResultBlock` for tool observations.
-- **Hooks system:** `PreToolUse` and `PostToolUse` hooks intercept events to validate, log, modify, or block actions in real-time — exactly what our normalization layer needs.
-- **Custom tools:** Implemented as in-process MCP servers (`create_sdk_mcp_server`), eliminating separate processes.
-- **Subscription reuse:** Yes — uses your Anthropic API key directly.
-- **Language:** Python (`claude-agent-sdk`) and TypeScript SDKs available.
-- **Risk:** SDK is evolving rapidly. API surface may change.
-- **Refs:** [Agent SDK Python Docs](https://platform.claude.com/docs/en/agent-sdk/python), [Streaming Docs](https://platform.claude.com/docs/en/agent-sdk/streaming-output), [GitHub](https://github.com/anthropics/claude-agent-sdk-python)
+#### Package Lineage
 
-#### OpenAI Agents SDK
+| Old Name | New Name | Status |
+|----------|----------|--------|
+| `claude-code-sdk` (PyPI) | `claude-agent-sdk` (PyPI) | **Use new name** |
+| `@anthropic-ai/claude-code` (npm) | `@anthropic-ai/claude-agent-sdk` (npm) | **Use new name** |
 
-- **What:** OpenAI's framework for building multi-agent applications with tool use, handoffs, and tracing.
-- **Runtime model:** Define agents with tools, run via `Runner.run()` (blocking) or `Runner.run_streamed()` (streaming).
-- **Streaming Events:** `StreamEvent = Union[RawResponsesStreamEvent, RunItemStreamEvent, AgentUpdatedStreamEvent]`
-  - `RawResponsesStreamEvent` (`type="raw_response_event"`) — token-level deltas from the LLM.
-  - `RunItemStreamEvent` (`type="run_item_stream_event"`) — higher-level items: `tool_called`, `tool_output`, `message_output_created`, `handoff_requested`, `reasoning_item_created`.
-  - `AgentUpdatedStreamEvent` — fires on agent handoffs.
-- **Key for us:** The `RunItemStreamEvent` with `name="tool_called"` and `name="tool_output"` maps directly to our `TOOL_CALLED`/`TOOL_RESULT` normalized events.
-- **Known issue:** `run_streamed()` buffers `tool_call_item` events and only emits them when execution starts, not when the LLM decides to call. This delays real-time feedback. ([GitHub #1282](https://github.com/openai/openai-agents-python/issues/1282))
-- **Subscription reuse:** Yes — uses your OpenAI API key.
-- **Language:** Python-first (`openai-agents`), TypeScript also available.
-- **Risk:** Different event model than Claude's. The buffering issue may limit real-time observation fidelity.
-- **Refs:** [Streaming Docs](https://openai.github.io/openai-agents-python/streaming/), [Stream Events Reference](https://openai.github.io/openai-agents-python/ref/stream_events/)
+Related but different: `@anthropic-ai/sdk` is the low-level Anthropic API client (no agent loop).
 
-#### Claude Code CLI as Fallback (Model B)
+#### TypeScript SDK (v0.2.34) — Our Primary Interface
 
-When SDK embedding is impractical, Claude Code CLI supports `--output-format stream-json` which emits NDJSON (newline-delimited JSON) with every token, turn, and tool interaction. This gives us a structured observation channel without SDK dependency.
+**Why TypeScript over Python:** The TS SDK is more mature (0.2.34 vs 0.1.30), supports all 12 hook events (Python only has 6), has runtime control methods (`setModel`, `setPermissionMode`), and has 1.75M+ npm downloads. For a Tauri sidecar, it's the natural choice.
 
-```bash
-claude -p "implement auth module" --output-format stream-json --verbose
+**V1 API — `query()` function:**
+```typescript
+import { query } from '@anthropic-ai/claude-agent-sdk';
+
+const q = query({
+  prompt: "Fix the auth bug in src/auth.ts",
+  options: {
+    allowedTools: ["Read", "Edit", "Grep", "Glob"],
+    model: "claude-sonnet-4-5-20250929",
+    includePartialMessages: true,  // CRITICAL: enables streaming
+    maxBudgetUsd: 1.00,
+  }
+});
+
+for await (const message of q) {
+  // message: SDKMessage (see taxonomy below)
+}
 ```
 
-Key capabilities:
-- **Session management:** Capture `session_id` from JSON output, resume with `--resume <id>`.
-- **Stream chaining:** `--input-format stream-json` enables agent-to-agent piping.
-- **JSON Schema output:** `--json-schema` forces structured output conforming to a schema.
-- **Refs:** [Headless Mode Docs](https://code.claude.com/docs/en/headless)
+Additional methods on the `Query` object:
+- `q.interrupt()` — stop agent mid-execution
+- `q.rewindFiles(userMessageUuid)` — restore files to checkpoint
+- `q.setModel(model)` — change model mid-session
+- `q.setPermissionMode(mode)` — change permissions mid-session
+- `q.supportedModels()` — list available models
+- `q.accountInfo()` — billing/account info
+- `q.mcpServerStatus()` — MCP connection health
 
-#### AG-UI Protocol (CopilotKit) — Must Study
+**V2 API (unstable preview) — Session-based:**
+```typescript
+import { unstable_v2_createSession, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
 
-CopilotKit's **AG-UI (Agent-User Interaction Protocol)** is an open standard adopted by Google, LangChain, AWS, Microsoft, Mastra, and PydanticAI for connecting agent backends to frontend applications. This is directly relevant to our Adapter Protocol.
+// Create
+await using session = unstable_v2_createSession({ model: 'claude-opus-4-6' });
+await session.send('Fix the auth bug');
+for await (const msg of session.stream()) { ... }
 
-Key concepts:
-- **Generative UI:** Agents generate and update UI components dynamically at runtime.
-- **Shared State:** Synchronized state layer that both agents and UI can read/write in real-time.
-- **Human-in-the-Loop:** Agents pause execution to request user input before continuing.
-- **Framework-agnostic:** Works with LangGraph, CrewAI, AutoGen, Mastra, PydanticAI.
-
-**Why this matters:** AG-UI solves a similar problem to our Adapter Protocol — bridging agent backends to frontends. We should study it deeply and either adopt it as a layer in our protocol or ensure compatibility.
-- **Refs:** [CopilotKit](https://www.copilotkit.ai/), [GitHub](https://github.com/CopilotKit/CopilotKit)
-
-#### Normalization Layer
-
-Regardless of which SDK is running underneath, the Host sees a unified event stream:
-
-```
-AgentEvent =
-  | { type: "TASK_STARTED",    taskId, agent, timestamp }
-  | { type: "TOOL_CALLED",     taskId, toolName, input, timestamp }
-  | { type: "TOOL_RESULT",     taskId, toolName, output, timestamp }
-  | { type: "ARTIFACT_CHANGED",taskId, filePath, diff, timestamp }
-  | { type: "TEXT_DELTA",      taskId, content, timestamp }
-  | { type: "TASK_COMPLETED",  taskId, result, timestamp }
-  | { type: "TASK_FAILED",     taskId, error, timestamp }
-  | { type: "AGENT_THINKING",  taskId, content, timestamp }
+// Resume after crash
+await using resumed = unstable_v2_resumeSession(savedSessionId, { model: 'claude-opus-4-6' });
 ```
 
-**Research Question:** Can we build a thin normalization shim (<500 LOC per SDK) that converts native SDK events into the above schema? Or is the impedance mismatch too large?
+#### Message Type Taxonomy
+
+```typescript
+type SDKMessage =
+  | SDKAssistantMessage           // Complete response with ContentBlocks
+  | SDKUserMessage                // User input
+  | SDKUserMessageReplay          // Replayed during session resume
+  | SDKResultMessage              // Terminal: success/error + cost data
+  | SDKSystemMessage              // Session init, compact boundary
+  | SDKPartialAssistantMessage    // Streaming deltas (only with includePartialMessages)
+  | SDKCompactBoundaryMessage     // Context window compaction marker
+
+// ContentBlock types inside AssistantMessage.content:
+type ContentBlock =
+  | TextBlock          // { type: "text", text: string }
+  | ThinkingBlock      // { type: "thinking", thinking: string, signature: string }
+  | ToolUseBlock       // { type: "tool_use", id: string, name: string, input: object }
+  | ToolResultBlock    // { type: "tool_result", tool_use_id: string, content: any, is_error: boolean }
+```
+
+**ResultMessage subtypes** (for our error-handling):
+`'success'` | `'error_max_turns'` | `'error_during_execution'` | `'error_max_budget_usd'` | `'error_max_structured_output_retries'`
+
+**ResultMessage includes:** `total_cost_usd`, `duration_ms`, `usage` (tokens), `session_id`
+
+#### Streaming Event Sequence (Tool-Call Cycle)
+
+When `includePartialMessages: true`, here's the exact event sequence:
+
+```
+ 1. SDKPartialAssistantMessage (message_start)
+ 2. SDKPartialAssistantMessage (content_block_start)         — text block begins
+ 3. SDKPartialAssistantMessage (content_block_delta, text_delta) × N  — reasoning streams
+ 4. SDKPartialAssistantMessage (content_block_stop)          — text done
+ 5. SDKPartialAssistantMessage (content_block_start, tool_use)— tool call begins (name visible!)
+ 6. SDKPartialAssistantMessage (content_block_delta, input_json_delta) × N — input streams
+ 7. SDKPartialAssistantMessage (content_block_stop)          — tool definition complete
+ 8. SDKPartialAssistantMessage (message_stop)
+ 9. SDKAssistantMessage                                      — COMPLETE message with all blocks
+10. --- PreToolUse hook fires → tool executes → PostToolUse hook fires ---
+11. SDKPartialAssistantMessage (message_start)               — response to tool result
+12. SDKPartialAssistantMessage (content_block_delta, text_delta) × N
+13. SDKPartialAssistantMessage (message_stop)
+14. SDKAssistantMessage                                      — complete follow-up
+15. SDKResultMessage                                         — final result + cost
+```
+
+**Key insight:** Step 5 gives us the tool name BEFORE execution. Step 9 gives us the complete tool input. Steps 10's hooks give us interception. This is sufficient for real-time UI updates.
+
+**Caveat:** When `maxThinkingTokens` is set, `SDKPartialAssistantMessage` events are NOT emitted. You only get complete messages. Thinking and streaming are mutually exclusive.
+
+#### Hooks System (12 Event Types in TypeScript)
+
+| Hook Event | When | Can Modify? | Can Block? |
+|------------|------|-------------|------------|
+| **PreToolUse** | Before tool execution | YES (modify input) | YES (deny) |
+| **PostToolUse** | After tool execution | Add context | No |
+| **PostToolUseFailure** | After tool failure | Add context | No |
+| **UserPromptSubmit** | User sends prompt | YES (modify prompt) | No |
+| **Stop** | Agent stops | No | No |
+| **SubagentStart** | Subagent spawned | No | No |
+| **SubagentStop** | Subagent finished | No | No |
+| **PreCompact** | Before context compaction | No | No |
+| **PermissionRequest** | Permission dialog would show | YES (auto-approve) | No |
+| **SessionStart** | Session begins | No | No |
+| **SessionEnd** | Session ends | No | No |
+| **Notification** | Status messages | No | No |
+
+**For our normalization layer, we care most about:**
+- `PreToolUse` → emit `TOOL_CALLED` event to UI
+- `PostToolUse` → emit `TOOL_RESULT` event to UI
+- `PostToolUseFailure` → emit `TOOL_FAILED` event to UI
+- `SessionStart` / `SessionEnd` → emit `TASK_STARTED` / `TASK_COMPLETED`
+- `SubagentStart` / `SubagentStop` → track parallel agent work
+
+**Hook configuration:**
+```typescript
+const q = query({
+  prompt: "...",
+  options: {
+    hooks: {
+      PreToolUse: [{ matcher: '.*', callback: onToolCall, timeout: 30 }],
+      PostToolUse: [{ matcher: '.*', callback: onToolResult, timeout: 30 }],
+      SessionStart: [{ callback: onSessionStart }],
+      SessionEnd: [{ callback: onSessionEnd }],
+    }
+  }
+});
+```
+
+#### Built-in Tools (Complete List)
+
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `Read` | Read files | |
+| `Write` | Create new files | |
+| `Edit` | String replacements in files | |
+| `Bash` | Run terminal commands | Most powerful, most dangerous |
+| `BashOutput` | Get background bash output | |
+| `KillBash` | Kill background bash | |
+| `Glob` | Find files by pattern | |
+| `Grep` | Search file contents | |
+| `WebSearch` | Web search | |
+| `WebFetch` | Fetch web pages | |
+| `NotebookEdit` | Edit Jupyter notebooks | |
+| `TodoWrite` | Task management | |
+| `Task` | Spawn subagents | Parallel execution |
+| `AskUserQuestion` | Ask user for input | **Critical for HITL** |
+| `ExitPlanMode` | Exit planning | |
+| `ListMcpResources` | List MCP resources | |
+| `ReadMcpResource` | Read MCP resources | |
+
+Custom MCP tools follow the naming pattern: `mcp__<server>__<tool>` (e.g., `mcp__myserver__deploy`).
+
+#### Tool Permission Control
+
+```typescript
+// Whitelist (read-only agent)
+options: { allowedTools: ["Read", "Glob", "Grep"] }
+
+// Blacklist (no destructive ops)
+options: { disallowedTools: ["Bash", "Write"] }
+
+// Custom permission callback (fine-grained)
+options: {
+  canUseTool: async (toolName, input, context) => {
+    if (toolName === "Write" && input.filePath?.startsWith("/etc/"))
+      return { type: "deny", message: "Protected path" };
+    return { type: "allow" };
+  }
+}
+
+// Permission modes
+options: { permissionMode: "default" | "acceptEdits" | "bypassPermissions" | "plan" }
+```
+
+#### Session Management
+
+- **Persistence:** Sessions persist to `~/.claude/projects/`. Survive process restart.
+- **Resume:** Pass `resume: sessionId` in options. Full conversation history restored.
+- **Fork:** Pass `resume: sessionId, forkSession: true` to branch from a point.
+- **Session ID capture:** Available in `SDKSystemMessage` (subtype `'init'`) and in `SDKResultMessage`.
+- **Concurrent sessions:** YES — each is a separate subprocess (~50-100MB each).
+
+#### Billing / Auth Model
+
+| Method | How | Cost |
+|--------|-----|------|
+| **API Key (BYOK)** | `ANTHROPIC_API_KEY` env var | Pay-per-token (Sonnet: $3/$15 per 1M tokens) |
+| **Bedrock** | `CLAUDE_CODE_USE_BEDROCK=1` | AWS pricing |
+| **Vertex AI** | `CLAUDE_CODE_USE_VERTEX=1` | GCP pricing |
+| **Azure Foundry** | `CLAUDE_CODE_USE_FOUNDRY=1` | Azure pricing |
+
+**Critical:** Anthropic explicitly forbids third-party apps from using Claude Pro/Max subscription auth without prior approval. Our Host MUST use API key auth (BYOK).
+
+Cost guardrail: `maxBudgetUsd` per session, `total_cost_usd` in ResultMessage for tracking.
+
+#### Known Gaps for Our Architecture
+
+1. **No multi-session file locking** — we must implement advisory locks in the Host.
+2. **MCP concurrent tool call bug** — in-process MCP servers can hit "Stream closed" under concurrency. Use stdio MCP servers for concurrent scenarios.
+3. **Streaming + Thinking mutually exclusive** — if extended thinking is enabled, partial messages stop. Must choose per-session.
+4. **~50-100MB per concurrent agent** — each session is a subprocess. Budget memory accordingly.
+5. **SDK evolving weekly** — pin versions, abstract behind normalization layer.
+
+#### Normalization Layer Mapping
+
+The Claude Agent SDK maps cleanly to our unified event schema:
+
+| Our Event | SDK Source | How to Capture |
+|-----------|-----------|----------------|
+| `TASK_STARTED` | `SessionStart` hook | Hook fires on session init |
+| `TOOL_CALLED` | `PreToolUse` hook OR `SDKPartialAssistantMessage` (step 5: `content_block_start, tool_use`) | Hook gives tool name + input; streaming gives it earlier (before execution) |
+| `TOOL_RESULT` | `PostToolUse` hook OR `SDKAssistantMessage` containing `ToolResultBlock` | Hook fires immediately after execution |
+| `TOOL_FAILED` | `PostToolUseFailure` hook | TS-only hook |
+| `ARTIFACT_CHANGED` | `PostToolUse` hook on `Write`/`Edit` tools — extract `filePath` from input | We know exactly which files changed and how |
+| `TEXT_DELTA` | `SDKPartialAssistantMessage` (`content_block_delta, text_delta`) | Real-time token stream |
+| `TASK_COMPLETED` | `SDKResultMessage` (subtype `'success'`) | Includes cost, duration, usage |
+| `TASK_FAILED` | `SDKResultMessage` (subtype `'error_*'`) | 4 error subtypes for granular handling |
+| `AGENT_THINKING` | `SDKAssistantMessage` containing `ThinkingBlock` | Only in complete messages (not streamed) |
+| `SUBAGENT_STARTED` | `SubagentStart` hook | Parallel work tracking |
+| `SUBAGENT_COMPLETED` | `SubagentStop` hook | Parallel work tracking |
+| `BUDGET_UPDATE` | `SDKResultMessage.total_cost_usd` | Per-session cost tracking |
+
+**Assessment:** The mapping is direct. Estimated normalization shim: **~200-300 LOC** (well under the 500 LOC threshold). The hooks system does most of the heavy lifting — we essentially register 6-8 hooks and translate their payloads.
+
+**One design choice:** We can use EITHER hooks OR streaming events for tool observation. Hooks are cleaner (structured, typed) but fire synchronously. Streaming events are lower-latency but require accumulation logic. **Recommendation:** Use hooks for the normalization layer, streaming for the live text display.
 
 ---
 
