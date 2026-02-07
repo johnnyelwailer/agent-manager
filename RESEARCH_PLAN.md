@@ -532,6 +532,212 @@ interface VerificationPrimitive {
 
 **Experiment 2.2:** Populate these primitives from a real project directory (with `PLAN.md`, `spec.md`, etc.). Validate that the schema is sufficient to render a meaningful Tree View + Kanban Board.
 
+### 2.3 — Workflow Data Model (Evolution from Primitives)
+
+> **Insight:** The abstract primitives (Context, Strategy, Execution, Verification) are useful as a rendering abstraction but don't map to how developers think about their work. A second data model bridges this gap.
+
+The **Workflow Model** introduces concrete concepts from real development workflows:
+
+```
+Project (multi-repo container)
+  └── Repo[] (git repositories)
+  └── Issue[] (external work items linked to Jira/GitHub/Linear/Azure DevOps)
+        └── Plan (step-by-step breakdown)
+              └── PlanStep[]
+        └── Task[] (local agent tasks — one issue can have MANY tasks)
+              └── VerificationPipeline (4-stage quality gate)
+```
+
+#### Critical Distinction: External Work Items vs. Local Agent Tasks
+
+This is a fundamental modeling decision:
+
+| Concept | What It Is | Cardinality | Examples |
+|---------|-----------|-------------|---------|
+| **Issue** (external) | A work item from an external system. Could be a Jira epic, story, subtask, GitHub issue, or even a local idea. Represents the *what* — the business intent. | One per work request | `UAH-42: Add WebSocket reconnection`, a Jira subtask, a GitHub issue |
+| **Task** (local) | A discrete unit of agent work. Represents the *how* — the technical execution. Assigned to one agent, targets specific repos. | Many per Issue | "Update reconnection logic in `agent-runtime`", "Add retry tests in `agent-sdk`", "Update types in `agent-manager`" |
+
+**Why this matters:**
+- A single Jira subtask (e.g., "Add retry logic to WebSocket client") may spawn 3 agent tasks if the change touches 3 repos.
+- Each agent task has its own verification pipeline (prechecks, AI review, PR, approval).
+- The Issue tracks aggregate progress; individual Tasks track execution detail.
+- Users think in Issues; agents work in Tasks. The UI must bridge both mental models.
+
+**One Issue → Many Tasks example:**
+```
+Issue: UAH-42 "Add WebSocket reconnection with exponential backoff"
+  ├── Task 1: "Implement reconnection logic" → agent-runtime repo → Agent: Sonnet
+  │     └── Pipeline: ✅ Prechecks → ✅ AI Review → ✅ PR #87 → ⏳ Approval
+  ├── Task 2: "Add reconnection config types" → agent-sdk repo → Agent: Haiku
+  │     └── Pipeline: ✅ Prechecks → ✅ AI Review → ✅ PR #34 → ✅ Approved
+  └── Task 3: "Update WebSocket hook in UI" → agent-manager repo → Agent: Sonnet
+        └── Pipeline: 🔄 Prechecks → ⏸ AI Review → ⏸ PR → ⏸ Approval
+```
+
+#### Issue Lifecycle
+
+```
+backlog → analysis → planning → in_progress → review → done
+                                    │                    ↑
+                                    └── blocked ─────────┘
+```
+
+- **backlog**: Raw idea or unanalyzed external issue
+- **analysis**: Agent or human analyzing scope and requirements
+- **planning**: Breaking down into concrete plan steps
+- **in_progress**: Tasks are being executed by agents
+- **review**: All tasks done, awaiting final issue-level review
+- **done**: Shipped / merged / closed
+- **blocked**: Impediment identified (can transition back to in_progress when resolved)
+
+#### Task Lifecycle
+
+```
+planning → queued → running → verifying → review → done
+                       │                            ↑
+                       └── failed ──────────────────┘
+                       └── blocked ─────────────────┘
+```
+
+### 2.4 — Verification Pipeline (4-Stage Model)
+
+> **Evolution:** Earlier designs had 7 granular verification types (lint, typecheck, test, build, security scan, PR review, manual approval). This was refined to 4 meaningful gates.
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  Prechecks   │───▶│  AI Review   │───▶│      PR      │───▶│   Approval   │
+│   (auto)     │    │   (auto)     │    │   (auto)     │    │   (manual)   │
+├──────────────┤    ├──────────────┤    ├──────────────┤    ├──────────────┤
+│ lint         │    │ agent reviews│    │ branch push  │    │ human review │
+│ typecheck    │    │ the diff for │    │ PR creation  │    │ approve or   │
+│ tests        │    │ correctness  │    │ CI pipeline  │    │ request      │
+│ build        │    │ & architecture│   │              │    │ changes      │
+│ coverage     │    │              │    │              │    │              │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+```
+
+**Why 4 stages, not 7:**
+1. **Prechecks** bundles lint/types/tests/build. Individually, these are implementation details — the meaningful question is "does the code meet automated quality standards?" One gate, one answer.
+2. **AI Review** is the novel stage. An AI agent reviews the diff for correctness, architecture concerns, and potential issues. This catches problems before human reviewers invest time.
+3. **PR** makes the transition from "code on a branch" to "code visible to the team" explicit. Branch push + PR creation + CI are one logical gate.
+4. **Approval** is the final human checkpoint. After all automated gates pass, a human makes the judgment call. Keeps humans in the loop for what matters.
+
+**Stage metadata:**
+```typescript
+interface VerificationMetadata {
+  // Prechecks
+  lintOk?: boolean;
+  typecheckOk?: boolean;
+  testsPassed?: number; testsFailed?: number; testsTotal?: number;
+  coverage?: number;
+  buildOk?: boolean;
+  // AI Review
+  reviewSeverity?: 'clean' | 'minor' | 'major' | 'critical';
+  reviewFindings?: string[];
+  reviewSuggestions?: string[];
+  // PR
+  prUrl?: string; prNumber?: number;
+  prStatus?: 'draft' | 'open' | 'merged' | 'closed';
+  // Approval
+  reviewers?: string[];
+  approvals?: number;
+  changesRequested?: boolean;
+}
+```
+
+### 2.5 — External System Integration
+
+> **Research Question:** How does the Host connect to external project management and code hosting systems?
+
+#### Supported External Systems
+
+| System | What We Get | Integration Method | Priority |
+|--------|------------|-------------------|----------|
+| **Jira** | Issues, epics, subtasks, status, priority, sprint | REST API v3 + webhooks | High |
+| **GitHub** | Issues, PRs, reviews, CI status, repo metadata | GraphQL API v4 + webhooks | High |
+| **Azure DevOps** | Work items, boards, repos, pipelines | REST API + service hooks | Medium |
+| **Linear** | Issues, projects, cycles, labels | GraphQL API + webhooks | Medium |
+| **GitLab** | Issues, MRs, pipelines | REST API v4 + webhooks | Low (v2) |
+
+#### Integration Architecture
+
+```
+External System (Jira, GitHub, etc.)
+      │
+      ▼ (REST/GraphQL API + webhooks)
+┌─────────────────┐
+│ External System  │  ← Adapter per system
+│    Adapter       │  ← Maps external work items → Issue type
+└────────┬────────┘
+         │
+         ▼ (normalized Issue objects)
+┌─────────────────┐
+│   Issue Store    │  ← Maintains link: externalId ↔ localIssueId
+│                  │  ← Syncs status bidirectionally
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Task Manager   │  ← Creates local agent Tasks from Issues
+│  (Ops / Kanban) │  ← Each Task independently verified
+└─────────────────┘
+```
+
+#### External Link Model
+
+```typescript
+interface ExternalProjectLink {
+  system: 'jira' | 'github' | 'azure_devops' | 'linear' | 'gitlab';
+  baseUrl: string;         // e.g., "https://mycompany.atlassian.net"
+  projectKey?: string;     // e.g., "UAH" for Jira
+  org?: string;            // e.g., "anthropics" for GitHub
+}
+
+// On each Issue:
+interface Issue {
+  // ...
+  externalId?: string;     // "UAH-42" (Jira), "#123" (GitHub), etc.
+  externalUrl?: string;    // Direct link to the external item
+  externalSystem?: ExternalProjectLink['system'];
+}
+```
+
+#### Sync Strategy
+
+1. **Pull on startup**: Fetch open issues from configured external systems.
+2. **Webhook for real-time**: Register webhooks for status changes, comments, PR events.
+3. **Push on completion**: When all Tasks for an Issue complete and verification passes, optionally update the external system (close Jira ticket, merge PR, etc.).
+4. **Conflict resolution**: External system is source of truth for issue metadata (title, description, priority). Local system is source of truth for agent tasks and verification status.
+
+#### Multi-Repo Project Model
+
+Real projects often span multiple repositories. The `Project` type is a container:
+
+```typescript
+interface Project {
+  id: string;
+  name: string;
+  repos: Repo[];              // Multiple git repositories
+  externalLinks: ExternalProjectLink[];  // Connected external systems
+  issues: Issue[];            // Work items (may span repos)
+}
+
+interface Repo {
+  id: string;
+  name: string;
+  path: string;               // Local filesystem path
+  remoteUrl?: string;         // git remote URL
+  defaultBranch: string;      // "main" | "master" | etc.
+}
+```
+
+**Multi-repo task example:** A single issue ("Add shared auth types") might produce:
+- Task 1 in `agent-sdk` repo: Define the types
+- Task 2 in `agent-runtime` repo: Use the types in the backend
+- Task 3 in `agent-manager` repo: Use the types in the frontend
+
+Each task gets its own verification pipeline, its own PR, and its own approval cycle. The Issue tracks whether ALL tasks are complete.
+
 ---
 
 ## Phase 3: State Management
@@ -770,7 +976,13 @@ Safety Net:        Git auto-snapshots before every agent run
 |------|-----------|
 | **Host** | The desktop application (GUI shell). Renders primitives. Does not understand domain-specific tools. |
 | **Adapter** | A plugin that bridges a specific tool/workflow to the Host's primitive model. |
-| **Primitive** | One of 4 abstract data types: Context, Strategy, Execution, Verification. |
+| **Primitive** | One of 4 abstract data types: Context, Strategy, Execution, Verification. Used by the rendering layer. |
+| **Issue** | An external work item (Jira ticket, GitHub issue, idea). Represents business intent (*what* to do). One issue can produce many agent tasks. |
+| **Task** | A local unit of agent work. Represents technical execution (*how* to do it). Assigned to one agent, targets specific repos. Has its own verification pipeline. |
+| **Verification Pipeline** | A 4-stage quality gate: Prechecks (auto) → AI Review (auto) → PR (auto) → Approval (manual). Each Task has its own pipeline. |
+| **Project** | A multi-repo container. Groups repositories, external system links, and issues under one umbrella. |
+| **Repo** | A git repository within a Project. Tasks target specific repos; one issue may span multiple repos. |
+| **External System** | A third-party tool that provides work items (Jira, GitHub, Azure DevOps, Linear). Connected via adapters. |
 | **Cartridge** | Informal name for an external agent tool (Claude Code, SpecKit, MetaMorph, etc.). |
 | **Sidecar** | A co-process (TypeScript) that runs alongside the Tauri Rust backend to handle SDK interaction. |
 | **BYOK** | Bring Your Own Key — users provide their own API keys for Claude/OpenAI. |
