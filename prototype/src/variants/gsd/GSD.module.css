@@ -1,0 +1,1210 @@
+/* ================================================================== */
+/* GSD (Get Shit Done) — Dark Theme CSS Module                        */
+/* ================================================================== */
+
+/* ================================================================== */
+/* Animations                                                          */
+/* ================================================================== */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ================================================================== */
+/* Shell — full-screen grid                                            */
+/* ================================================================== */
+
+.shell {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 48px 1fr 28px;
+  background: #0a0a0c;
+  color: #e4e4e7;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ================================================================== */
+/* Top Bar                                                             */
+/* ================================================================== */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #0a0a0c;
+  border-bottom: 1px solid #1f1f23;
+  z-index: 10;
+  height: 48px;
+}
+
+.topLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gsdLogo {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  user-select: none;
+}
+
+.gsdVersion {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.topSep {
+  width: 1px;
+  height: 18px;
+  background: #1f1f23;
+  flex-shrink: 0;
+}
+
+.topMilestone {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a1a1aa;
+}
+
+.topPhaseLabel {
+  font-size: 11px;
+  color: #71717a;
+  padding: 2px 8px;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 4px;
+}
+
+.topCenter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.chipDotRun {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f655;
+  animation: pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.chipDotDone {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topBtn {
+  padding: 5px 12px;
+  background: transparent;
+  color: #a1a1aa;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.topBtn:hover {
+  border-color: #3f3f46;
+  color: #e4e4e7;
+}
+
+.topBtnPrimary {
+  padding: 5px 14px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.topBtnPrimary:hover {
+  background: #ea580c;
+}
+
+/* ================================================================== */
+/* Body — 3 columns                                                    */
+/* ================================================================== */
+
+.body {
+  display: flex;
+  overflow: hidden;
+}
+
+/* ================================================================== */
+/* Left — Pipeline Sidebar                                             */
+/* ================================================================== */
+
+.pipelineSidebar {
+  width: 240px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #1f1f23;
+  background: #0c0c0e;
+  overflow-y: auto;
+}
+
+.pipelineHeader {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #1f1f23;
+}
+
+.milestoneName {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin: 0 0 2px 0;
+}
+
+.milestoneVersion {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+}
+
+/* Progress section */
+.progressSection {
+  padding: 10px 14px;
+  border-bottom: 1px solid #1f1f23;
+}
+
+.progressBarWrap {
+  width: 100%;
+  height: 4px;
+  background: #1f1f23;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: #10b981;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.progressLabel {
+  font-size: 10px;
+  color: #71717a;
+  font-family: monospace;
+}
+
+/* Phase list */
+.phaseList {
+  flex: 1;
+  padding: 6px 0;
+}
+
+.phaseItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-left: 3px solid transparent;
+}
+
+.phaseItem:hover {
+  background: #111113;
+}
+
+.phaseActive {
+  background: #14120e;
+  border-left-color: #f97316;
+}
+
+.phaseActive:hover {
+  background: #1a160e;
+}
+
+.phaseIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.phaseInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.phaseTitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: #d4d4d8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phaseNum {
+  font-weight: 700;
+  color: #f97316;
+  margin-right: 4px;
+}
+
+.phaseMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.phaseStatusLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.phaseTaskCount {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+}
+
+.phasePlanCount {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+}
+
+/* Phase status color variants */
+.phComplete .phaseStatusLabel { color: #10b981; }
+.phExecuting .phaseStatusLabel { color: #3b82f6; animation: pulse 2s ease-in-out infinite; }
+.phPlanning .phaseStatusLabel { color: #eab308; }
+.phNotstarted .phaseStatusLabel { color: #52525b; }
+.phDiscussing .phaseStatusLabel { color: #a78bfa; }
+.phVerifying .phaseStatusLabel { color: #a78bfa; }
+
+/* ================================================================== */
+/* Todo Section (inside pipeline sidebar)                              */
+/* ================================================================== */
+
+.todoSection {
+  border-top: 1px solid #1f1f23;
+  padding: 10px 0;
+}
+
+.todoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #71717a;
+}
+
+.todoBadge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f97316;
+  background: #1a1207;
+  border: 1px solid #3d2a06;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.todoItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 14px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.todoCheck {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #3f3f46;
+  border-radius: 3px;
+  margin-top: 1px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.todoCheck:hover {
+  border-color: #f97316;
+}
+
+.todoText {
+  color: #a1a1aa;
+  line-height: 1.4;
+}
+
+.todoArea {
+  padding: 6px 14px;
+}
+
+/* ================================================================== */
+/* Center — Chat Panel                                                 */
+/* ================================================================== */
+
+.chatPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0c;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.chatScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Chat messages */
+.chatMsg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.msgUser {
+  align-self: flex-end;
+  background: #1a1207;
+  border: 1px solid #3d2a06;
+  color: #e4e4e7;
+}
+
+.msgAssistant {
+  align-self: flex-start;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  color: #d4d4d8;
+}
+
+.msgSystem {
+  align-self: center;
+  background: #0e0e10;
+  border: 1px solid #1a1a1e;
+  color: #71717a;
+  font-family: monospace;
+  font-size: 11px;
+  max-width: 95%;
+}
+
+.msgCheckpoint {
+  align-self: stretch;
+  max-width: 100%;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-left: 3px solid #f97316;
+  padding: 10px 14px;
+  border-radius: 6px;
+}
+
+.msgCommand {
+  align-self: flex-start;
+  background: #0e0e10;
+  border: 1px solid #1a1a1e;
+  font-family: monospace;
+  font-size: 12px;
+  color: #f97316;
+  max-width: 95%;
+}
+
+.msgAgentBadge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #1e1b4b;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+  margin-bottom: 4px;
+}
+
+.msgContent {
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.msgTime {
+  font-size: 10px;
+  color: #52525b;
+  margin-top: 4px;
+}
+
+/* Checkpoint box */
+.checkpointBox {
+  border: 1px dashed #f97316;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #111113;
+  margin: 4px 0;
+}
+
+.checkpointHeader {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin-bottom: 8px;
+}
+
+.checkpointOptions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.checkpointBtn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid #1f1f23;
+  background: #111113;
+  color: #a1a1aa;
+  transition: all 0.15s;
+}
+
+.checkpointBtn:hover {
+  border-color: #f97316;
+  color: #e4e4e7;
+}
+
+/* Chat input area */
+.chatInputArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #1f1f23;
+  background: #0c0c0e;
+  flex-shrink: 0;
+}
+
+.chatPrompt {
+  color: #f97316;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.chatInput {
+  flex: 1;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  color: #e4e4e7;
+  font-size: 13px;
+  font-family: monospace;
+  outline: none;
+}
+
+.chatInput::placeholder {
+  color: #3f3f46;
+}
+
+.chatSendBtn {
+  padding: 5px 14px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.chatSendBtn:hover {
+  background: #ea580c;
+}
+
+/* ================================================================== */
+/* Right Panel                                                         */
+/* ================================================================== */
+
+.rightPanel {
+  width: 320px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #1f1f23;
+  background: #0c0c0e;
+  overflow: hidden;
+}
+
+.rightTabs {
+  display: flex;
+  border-bottom: 1px solid #1f1f23;
+  flex-shrink: 0;
+}
+
+.rightTab {
+  flex: 1;
+  padding: 8px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #52525b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.rightTab:hover {
+  color: #a1a1aa;
+}
+
+.rightTabActive {
+  color: #e4e4e7;
+  border-bottom-color: #f97316;
+}
+
+.rightContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* ================================================================== */
+/* Phase Detail (right panel content)                                  */
+/* ================================================================== */
+
+.phaseDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phaseDetailHeader {
+  margin-bottom: 4px;
+}
+
+.phaseDetailNum {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f97316;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.phaseDetailTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fafafa;
+  margin: 0;
+}
+
+.phaseDetailStatus {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin-top: 6px;
+}
+
+.pdscomplete { background: #052e16; color: #10b981; border: 1px solid #14532d; }
+.pdsexecuting { background: #172554; color: #3b82f6; border: 1px solid #1e3a5f; }
+.pdsplanning { background: #422006; color: #eab308; border: 1px solid #78350f; }
+.pdsnotstarted { background: #18181b; color: #52525b; border: 1px solid #27272a; }
+
+/* Context block */
+.contextBlock {
+  padding: 10px 12px;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+}
+
+.contextLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717a;
+  margin-bottom: 6px;
+}
+
+.contextText {
+  font-size: 12px;
+  color: #a1a1aa;
+  line-height: 1.6;
+}
+
+/* Criteria */
+.criteriaBlock {
+  padding: 10px 12px;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+}
+
+.criteriaLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717a;
+  margin-bottom: 8px;
+}
+
+.criteriaItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: #a1a1aa;
+  line-height: 1.4;
+}
+
+.criteriaCheck {
+  flex-shrink: 0;
+  font-size: 11px;
+  margin-top: 1px;
+}
+
+/* Plans */
+.plansBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plansLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717a;
+}
+
+.planCard {
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+
+.planCard:hover {
+  border-color: #2a2a2e;
+}
+
+.planHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.planName {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.planWave {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+}
+
+.planStatus {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.psdone { background: #052e16; color: #10b981; border: 1px solid #14532d; }
+.psexecuting { background: #172554; color: #3b82f6; border: 1px solid #1e3a5f; }
+.pspending { background: #18181b; color: #71717a; border: 1px solid #27272a; }
+.psfailed { background: #450a0a; color: #ef4444; border: 1px solid #7f1d1d; }
+
+/* Task list inside plans */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: background 0.1s;
+}
+
+.taskRow:hover {
+  background: #141416;
+}
+
+.taskDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #52525b;
+}
+
+.taskTitle {
+  flex: 1;
+  color: #d4d4d8;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskTypeTag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #141416;
+  border: 1px solid #1f1f23;
+  color: #71717a;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.taskCommit {
+  font-size: 9px;
+  font-family: monospace;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+/* Task row status variants */
+.trdone {
+  opacity: 0.6;
+}
+.trdone .taskDot { background: #10b981; }
+.trdone .taskTitle { color: #71717a; text-decoration: line-through; }
+
+.trrunning {
+  background: #0c1020;
+}
+.trrunning .taskDot { background: #3b82f6; box-shadow: 0 0 4px #3b82f644; }
+
+.trpending .taskDot { background: #3f3f46; }
+
+.noPlansMsg {
+  font-size: 12px;
+  color: #3f3f46;
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+}
+
+/* ================================================================== */
+/* Agent Fleet (right panel content)                                   */
+/* ================================================================== */
+
+.agentFleet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fleetHeader {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+}
+
+.fleetSubtext {
+  font-size: 11px;
+  color: #52525b;
+  margin-top: -6px;
+}
+
+.agentRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+
+.agentRow:hover {
+  border-color: #2a2a2e;
+}
+
+.agentDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotRunning { background: #3b82f6; box-shadow: 0 0 6px #3b82f655; animation: pulse 2s ease-in-out infinite; }
+.dotDone { background: #10b981; }
+.dotIdle { background: #52525b; }
+.dotSpawning { background: #eab308; box-shadow: 0 0 4px #eab30844; }
+.dotErrored { background: #ef4444; box-shadow: 0 0 6px #ef444455; }
+
+.agentRoleName {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d4d4d8;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentModelTag {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  background: #141416;
+  border: 1px solid #1f1f23;
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.agentCtx {
+  font-size: 10px;
+  color: #52525b;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.agentPhaseTag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #141416;
+  border: 1px solid #1f1f23;
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.agentStatusLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.slrunning { color: #3b82f6; }
+.slidle { color: #52525b; }
+.sldone { color: #10b981; }
+.slerrored { color: #ef4444; }
+
+/* Idle fleet section */
+.fleetIdleList {
+  border-top: 1px solid #1f1f23;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.fleetIdleLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #3f3f46;
+  margin-bottom: 6px;
+}
+
+.agentRowIdle {
+  opacity: 0.5;
+}
+
+/* Context bar */
+.ctxBarOuter {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 10px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ctxSeg {
+  width: 3px;
+  height: 100%;
+}
+
+.ctxGreen { background: #10b981; }
+.ctxYellow { background: #eab308; }
+.ctxOrange { background: #f97316; }
+.ctxRed { background: #ef4444; }
+.ctxEmpty { background: #1f1f23; }
+
+.ctxPct {
+  font-size: 9px;
+  color: #52525b;
+  font-family: monospace;
+  margin-left: 4px;
+}
+
+/* ================================================================== */
+/* Command Palette                                                     */
+/* ================================================================== */
+
+.cmdPalette {
+  border-top: 1px solid #1f1f23;
+  padding: 10px 14px;
+}
+
+.cmdToggle {
+  font-size: 10px;
+  font-weight: 600;
+  color: #52525b;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.cmdToggle:hover {
+  color: #a1a1aa;
+}
+
+.cmdGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cmdCategory {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmdCatLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #3f3f46;
+}
+
+.cmdBtnGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cmdBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #111113;
+  border: 1px solid #1f1f23;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.cmdBtn:hover {
+  border-color: #3f3f46;
+  color: #e4e4e7;
+}
+
+.cmdHot {
+  border-color: #7c2d12;
+  background: #14100c;
+}
+
+.cmdHot:hover {
+  border-color: #f97316;
+}
+
+.cmdHotDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f97316;
+  flex-shrink: 0;
+}
+
+/* ================================================================== */
+/* Status Bar                                                          */
+/* ================================================================== */
+
+.statusBar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #0c0c0e;
+  border-top: 1px solid #1f1f23;
+  font-size: 11px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sbModel {
+  color: #71717a;
+  font-weight: 500;
+}
+
+.sbSep {
+  width: 1px;
+  height: 14px;
+  background: #1f1f23;
+  flex-shrink: 0;
+}
+
+.sbTask {
+  color: #a1a1aa;
+  font-size: 11px;
+}
+
+.sbDir {
+  color: #52525b;
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.sbCtx {
+  color: #52525b;
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.sbRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sbProfile {
+  color: #71717a;
+  font-size: 11px;
+}
+
+.sbMode {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #141416;
+  border: 1px solid #1f1f23;
+  color: #a1a1aa;
+}
+
+.sbBranch {
+  font-family: monospace;
+  font-size: 10px;
+  color: #52525b;
+}
+
+/* ================================================================== */
+/* Scrollbar styling                                                   */
+/* ================================================================== */
+
+.pipelineSidebar::-webkit-scrollbar,
+.chatScroll::-webkit-scrollbar,
+.rightContent::-webkit-scrollbar {
+  width: 5px;
+}
+
+.pipelineSidebar::-webkit-scrollbar-track,
+.chatScroll::-webkit-scrollbar-track,
+.rightContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pipelineSidebar::-webkit-scrollbar-thumb,
+.chatScroll::-webkit-scrollbar-thumb,
+.rightContent::-webkit-scrollbar-thumb {
+  background: #1f1f23;
+  border-radius: 3px;
+}
+
+.pipelineSidebar::-webkit-scrollbar-thumb:hover,
+.chatScroll::-webkit-scrollbar-thumb:hover,
+.rightContent::-webkit-scrollbar-thumb:hover {
+  background: #2a2a2e;
+}
