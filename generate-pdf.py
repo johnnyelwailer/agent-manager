@@ -24,15 +24,15 @@ SS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots', 'screenshots.spe
 OUT_PDF = os.path.join(os.path.dirname(__file__), 'variant-showcase.pdf')
 PAGE_W, PAGE_H = A4  # 595 x 842 pt
 
-# Colors
-C_BG       = HexColor('#09090b')
-C_SURFACE  = HexColor('#18181b')
-C_BORDER   = HexColor('#27272a')
-C_TEXT     = HexColor('#e4e4e7')
-C_MUTED    = HexColor('#a1a1aa')
-C_ACCENT   = HexColor('#7c3aed')
-C_EMERALD  = HexColor('#10b981')
-C_AMBER    = HexColor('#f59e0b')
+# Colors – light theme for a readable printed document
+C_BG       = HexColor('#ffffff')
+C_SURFACE  = HexColor('#f8f8fa')
+C_BORDER   = HexColor('#d0d0d6')
+C_TEXT     = HexColor('#1a1a1a')
+C_MUTED    = HexColor('#555555')
+C_ACCENT   = HexColor('#5b21b6')
+C_EMERALD  = HexColor('#047857')
+C_AMBER    = HexColor('#b45309')
 C_WHITE    = HexColor('#ffffff')
 C_BLACK    = HexColor('#000000')
 
@@ -42,32 +42,32 @@ C_BLACK    = HexColor('#000000')
 
 sTitle = ParagraphStyle('Title', fontName='Helvetica-Bold', fontSize=28,
                         textColor=C_ACCENT, spaceAfter=4*mm, alignment=TA_LEFT)
-sSubtitle = ParagraphStyle('Subtitle', fontName='Helvetica', fontSize=13,
+sSubtitle = ParagraphStyle('Subtitle', fontName='Helvetica', fontSize=14,
                            textColor=C_MUTED, spaceAfter=12*mm, alignment=TA_LEFT)
 sH1 = ParagraphStyle('H1', fontName='Helvetica-Bold', fontSize=22,
                       textColor=C_ACCENT, spaceBefore=6*mm, spaceAfter=4*mm)
 sH2 = ParagraphStyle('H2', fontName='Helvetica-Bold', fontSize=16,
-                      textColor=HexColor('#e4e4e7'), spaceBefore=5*mm, spaceAfter=3*mm)
-sH3 = ParagraphStyle('H3', fontName='Helvetica-Bold', fontSize=12,
-                      textColor=HexColor('#a1a1aa'), spaceBefore=3*mm, spaceAfter=2*mm)
-sBody = ParagraphStyle('Body', fontName='Helvetica', fontSize=10,
-                        textColor=HexColor('#71717a'), leading=14, spaceAfter=2*mm,
+                      textColor=C_TEXT, spaceBefore=5*mm, spaceAfter=3*mm)
+sH3 = ParagraphStyle('H3', fontName='Helvetica-Bold', fontSize=13,
+                      textColor=HexColor('#333333'), spaceBefore=3*mm, spaceAfter=2*mm)
+sBody = ParagraphStyle('Body', fontName='Helvetica', fontSize=11,
+                        textColor=C_TEXT, leading=16, spaceAfter=2*mm,
                         alignment=TA_JUSTIFY)
-sCaption = ParagraphStyle('Caption', fontName='Helvetica-Oblique', fontSize=8.5,
-                           textColor=HexColor('#52525b'), alignment=TA_CENTER,
+sCaption = ParagraphStyle('Caption', fontName='Helvetica-Oblique', fontSize=9,
+                           textColor=C_MUTED, alignment=TA_CENTER,
                            spaceBefore=1*mm, spaceAfter=4*mm)
-sLabel = ParagraphStyle('Label', fontName='Helvetica-Bold', fontSize=9,
+sLabel = ParagraphStyle('Label', fontName='Helvetica-Bold', fontSize=10,
                          textColor=C_ACCENT, spaceAfter=1*mm)
-sBullet = ParagraphStyle('Bullet', fontName='Helvetica', fontSize=9.5,
-                          textColor=HexColor('#71717a'), leading=13,
+sBullet = ParagraphStyle('Bullet', fontName='Helvetica', fontSize=11,
+                          textColor=C_TEXT, leading=15,
                           leftIndent=12, bulletIndent=4, spaceAfter=1*mm)
-sTableHeader = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=8.5,
+sTableHeader = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=9,
                                textColor=C_WHITE, alignment=TA_CENTER)
-sTableCell = ParagraphStyle('TC', fontName='Helvetica', fontSize=8,
-                             textColor=HexColor('#d4d4d8'), alignment=TA_CENTER,
-                             leading=10)
-sTableCellL = ParagraphStyle('TCL', fontName='Helvetica-Bold', fontSize=8.5,
-                              textColor=HexColor('#e4e4e7'), leading=10)
+sTableCell = ParagraphStyle('TC', fontName='Helvetica', fontSize=9,
+                             textColor=C_TEXT, alignment=TA_CENTER,
+                             leading=12)
+sTableCellL = ParagraphStyle('TCL', fontName='Helvetica-Bold', fontSize=9,
+                              textColor=C_TEXT, leading=12)
 
 
 # ---------------------------------------------------------------------------
@@ -732,25 +732,25 @@ def build_pdf():
             )))
         story.append(Paragraph(
             f'{i+1}. {v["name"]} \u2014 <i>{v["tagline"]}</i>',
-            ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=10,
-                           textColor=HexColor('#a1a1aa'), leftIndent=8*mm, spaceAfter=1.5*mm),
+            ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=11,
+                           textColor=C_TEXT, leftIndent=8*mm, spaceAfter=1.5*mm),
         ))
 
     story.append(Spacer(1, 6*mm))
     story.append(Paragraph(
         'Appendix A: Comparative Analysis',
-        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=10,
-                       textColor=HexColor('#a1a1aa'), spaceAfter=1.5*mm),
+        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=11,
+                       textColor=C_TEXT, spaceAfter=1.5*mm),
     ))
     story.append(Paragraph(
         'Appendix B: Information Architecture Dimensions',
-        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=10,
-                       textColor=HexColor('#a1a1aa'), spaceAfter=1.5*mm),
+        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=11,
+                       textColor=C_TEXT, spaceAfter=1.5*mm),
     ))
     story.append(Paragraph(
         'Appendix C: Verification Pipeline Deep Dive',
-        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=10,
-                       textColor=HexColor('#a1a1aa'), spaceAfter=1.5*mm),
+        ParagraphStyle('TOCItem', fontName='Helvetica', fontSize=11,
+                       textColor=C_TEXT, spaceAfter=1.5*mm),
     ))
 
     story.append(PageBreak())
@@ -771,14 +771,14 @@ def build_pdf():
                     'Eight operational views exploring different information architectures for '
                     'managing AI agents. Each uses the original data model based on abstract '
                     'primitives: Context, Strategy, Execution, and Verification.',
-                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=10,
+                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=11,
                                    textColor=C_MUTED, alignment=TA_CENTER, spaceAfter=8*mm),
                 ))
             elif current_cat == 'Startup Variants':
                 story.append(Paragraph(
                     'Four landing page variants exploring how users begin new sessions: '
                     'through chat, dashboards, command palettes, or mission briefings.',
-                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=10,
+                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=11,
                                    textColor=C_MUTED, alignment=TA_CENTER, spaceAfter=8*mm),
                 ))
             elif current_cat == 'Workflow Variants':
@@ -786,7 +786,7 @@ def build_pdf():
                     'Two task managers built on a new workflow-oriented type system that models '
                     'real development workflows: Projects \u2192 Issues \u2192 Plans \u2192 Tasks \u2192 '
                     '4-stage Verification Pipeline (Prechecks \u2192 AI Review \u2192 PR \u2192 Approval).',
-                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=10,
+                    ParagraphStyle('CatDesc', fontName='Helvetica', fontSize=11,
                                    textColor=C_MUTED, alignment=TA_CENTER, spaceAfter=8*mm),
                 ))
             story.append(PageBreak())
@@ -894,10 +894,10 @@ def build_pdf():
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 8.5),
         # Alternating rows
-        *[('BACKGROUND', (0, i), (-1, i), HexColor('#1a1a2e') if i % 2 == 0 else HexColor('#16162a'))
+        *[('BACKGROUND', (0, i), (-1, i), HexColor('#f0f0f5') if i % 2 == 0 else C_WHITE)
           for i in range(1, len(table_data))],
         # Grid
-        ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#27272a')),
+        ('GRID', (0, 0), (-1, -1), 0.5, C_BORDER),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
@@ -923,8 +923,8 @@ def build_pdf():
         for level, variants in dim['spectrum']:
             story.append(Paragraph(
                 f'<b>{level}:</b> {", ".join(variants)}',
-                ParagraphStyle('DimItem', fontName='Helvetica', fontSize=9.5,
-                               textColor=HexColor('#a1a1aa'), leftIndent=8*mm,
+                ParagraphStyle('DimItem', fontName='Helvetica', fontSize=10,
+                               textColor=C_TEXT, leftIndent=8*mm,
                                spaceAfter=1.5*mm),
             ))
 
@@ -1105,9 +1105,9 @@ def build_pdf():
     stage_tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), C_ACCENT),
         ('TEXTCOLOR', (0, 0), (-1, 0), C_WHITE),
-        *[('BACKGROUND', (0, i), (-1, i), HexColor('#1a1a2e') if i % 2 == 0 else HexColor('#16162a'))
+        *[('BACKGROUND', (0, i), (-1, i), HexColor('#f0f0f5') if i % 2 == 0 else C_WHITE)
           for i in range(1, len(stages_data))],
-        ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#27272a')),
+        ('GRID', (0, 0), (-1, -1), 0.5, C_BORDER),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -1165,16 +1165,16 @@ def build_pdf():
     story.append(Paragraph(
         '<b>Original Model</b> (8 main + 4 startup variants):<br/>'
         'Context \u2192 Strategy \u2192 Execution \u2192 Verification',
-        ParagraphStyle('ModelDesc', fontName='Helvetica', fontSize=9.5,
-                       textColor=HexColor('#a1a1aa'), leftIndent=8*mm, spaceAfter=3*mm,
+        ParagraphStyle('ModelDesc', fontName='Helvetica', fontSize=10,
+                       textColor=C_TEXT, leftIndent=8*mm, spaceAfter=3*mm,
                        leading=14),
     ))
     story.append(Paragraph(
         '<b>Workflow Model</b> (Ops + Kanban):<br/>'
         'Project \u2192 Issue (Jira/DevOps) \u2192 Plan \u2192 Task \u2192 '
         'VerificationPipeline (4 stages)',
-        ParagraphStyle('ModelDesc', fontName='Helvetica', fontSize=9.5,
-                       textColor=HexColor('#a1a1aa'), leftIndent=8*mm, spaceAfter=3*mm,
+        ParagraphStyle('ModelDesc', fontName='Helvetica', fontSize=10,
+                       textColor=C_TEXT, leftIndent=8*mm, spaceAfter=3*mm,
                        leading=14),
     ))
 
