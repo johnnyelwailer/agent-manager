@@ -1,0 +1,368 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+.shell {
+  height: calc(100vh - 37px);
+  display: flex;
+  flex-direction: column;
+  background: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.headerTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.headerRight {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.addBtn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.board {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 220px;
+  border-right: 1px solid rgba(63, 63, 70, 0.3);
+}
+
+.stageReview {
+  min-width: 340px;
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.stageHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stageLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #71717a;
+}
+
+.stageLabelReview {
+  color: #fbbf24;
+}
+
+.stageCount {
+  background: rgba(63, 63, 70, 0.4);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  color: #71717a;
+}
+
+.stageIcon {
+  font-size: 14px;
+}
+
+.stageBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.stageConnector {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.connectorLine {
+  width: 1px;
+  height: 20px;
+  border-left: 1px dashed #3f3f46;
+}
+
+.connectorArrow {
+  color: #3f3f46;
+  font-size: 10px;
+}
+
+.taskCard {
+  margin: 4px 8px;
+  padding: 12px;
+  background: rgba(24, 24, 27, 0.8);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+  border-radius: 8px;
+  transition: all 0.15s;
+  animation: fade-in 0.2s ease-out;
+}
+
+.taskCard:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+.taskCardId {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #52525b;
+  margin-bottom: 4px;
+}
+
+.taskCardTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fafafa;
+  margin-bottom: 6px;
+}
+
+.taskCardAgent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.agentRunning {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.agentIdle {
+  background: rgba(113, 113, 122, 0.15);
+  color: #a1a1aa;
+}
+
+.agentError {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.miniLog {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #10b981;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.taskCardWorking {
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.06);
+}
+
+.reviewCard {
+  margin: 4px 8px;
+  padding: 16px;
+  background: rgba(24, 24, 27, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 10px;
+  animation: fade-in 0.2s ease-out;
+}
+
+.reviewTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.reviewMeta {
+  font-size: 12px;
+  color: #a1a1aa;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.reviewDiff {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 10px 12px;
+  background: rgba(9, 9, 11, 0.6);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.diffAdd {
+  color: #34d399;
+}
+
+.diffRemove {
+  color: #f87171;
+}
+
+.reviewActions {
+  display: flex;
+  gap: 8px;
+}
+
+.approveBtn {
+  flex: 1;
+  padding: 8px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.approveBtn:hover {
+  background: rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+.rejectBtn {
+  flex: 1;
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.changesBtn {
+  flex: 1;
+  padding: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.approveBtnDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.doneCard {
+  margin: 4px 8px;
+  padding: 10px 12px;
+  background: rgba(24, 24, 27, 0.4);
+  border: 1px solid rgba(63, 63, 70, 0.2);
+  border-radius: 8px;
+  opacity: 0.7;
+  animation: fade-in 0.2s ease-out;
+}
+
+.doneCardCheck {
+  color: #10b981;
+  margin-right: 6px;
+}
+
+.failedCard {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.failedLabel {
+  color: #f87171;
+  font-size: 11px;
+}
+
+.retryBtn {
+  font-size: 11px;
+  color: #a78bfa;
+  background: none;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.gateLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+}
+
+.emptyStage {
+  margin: 8px;
+  padding: 24px 16px;
+  border: 1px dashed rgba(63, 63, 70, 0.3);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #3f3f46;
+}
+
+.dispatchBtn {
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.footer {
+  padding: 8px 20px;
+  border-top: 1px solid rgba(63, 63, 70, 0.5);
+  font-size: 11px;
+  color: #52525b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,313 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+.shell {
+  height: calc(100vh - 37px);
+  display: flex;
+  flex-direction: column;
+  background: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.headerTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.headerStats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #71717a;
+}
+
+.headerStat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  overflow-x: auto;
+}
+
+.agentColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  flex: 1;
+  max-width: 380px;
+  background: rgba(24, 24, 27, 0.6);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.columnHeader {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agentRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.avatarRunning {
+  background: #10b981;
+}
+
+.avatarIdle {
+  background: #3f3f46;
+}
+
+.avatarErrored {
+  background: #ef4444;
+}
+
+.agentName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.agentModel {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+}
+
+.trustBadge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  margin-left: auto;
+}
+
+.trustAutonomous {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.trustSupervised {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.trustManual {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #52525b;
+  padding: 0 16px 10px;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.columnBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #52525b;
+  padding: 6px 8px;
+}
+
+.currentWork {
+  margin: 4px 8px 8px;
+  padding: 12px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+}
+
+.currentWorkTitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.currentWorkStream {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #10b981;
+  padding: 6px 8px;
+  background: rgba(9, 9, 11, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+.streamPulse::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #10b981;
+  animation: pulse-glow 1.5s infinite;
+}
+
+.taskCard {
+  margin: 4px 8px;
+  padding: 10px 12px;
+  background: rgba(9, 9, 11, 0.4);
+  border: 1px solid rgba(63, 63, 70, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.taskCard:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  transform: translateY(-1px);
+}
+
+.taskCardId {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #52525b;
+}
+
+.taskCardTitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e4e4e7;
+  margin: 4px 0;
+}
+
+.taskCardStatus {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.statusQueued {
+  background: rgba(113, 113, 122, 0.15);
+  color: #a1a1aa;
+}
+
+.statusPaused {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.statusFailed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.statusCompleted {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.unassignedColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  flex: 1;
+  max-width: 380px;
+  background: rgba(24, 24, 27, 0.3);
+  border: 1px dashed rgba(63, 63, 70, 0.4);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dispatchBtn {
+  font-size: 11px;
+  padding: 4px 10px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dropZone {
+  margin: 8px;
+  padding: 20px;
+  border: 1px dashed rgba(63, 63, 70, 0.4);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 11px;
+  color: #3f3f46;
+}
+
+.interruptBtn {
+  font-size: 10px;
+  color: #f87171;
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

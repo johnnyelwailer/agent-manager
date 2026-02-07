@@ -1,0 +1,1234 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ------------------------------------------------------------------ */
+/* Shell                                                               */
+/* ------------------------------------------------------------------ */
+
+.shell {
+  height: calc(100vh - 37px);
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  grid-template-columns: 280px 1fr;
+  background: #09090b;
+  color: #e4e4e7;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Top Bar                                                             */
+/* ------------------------------------------------------------------ */
+
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid #27272a;
+  background: #09090b;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.projectInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.projectAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.projectName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fafafa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbarCenter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.repoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.repoBadge:hover {
+  border-color: #3f3f46;
+}
+
+.costBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #10b981;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.agentCountBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #3b82f6;
+}
+
+.newIssueBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.newIssueBtn:hover {
+  background: #6d28d9;
+}
+
+/* ------------------------------------------------------------------ */
+/* Left Panel — Issue List                                             */
+/* ------------------------------------------------------------------ */
+
+.issueListPanel {
+  border-right: 1px solid #27272a;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #09090b;
+  display: flex;
+  flex-direction: column;
+}
+
+.filterBar {
+  padding: 8px 10px;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+
+.filterInput {
+  width: 100%;
+  padding: 6px 10px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  color: #e4e4e7;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.filterInput::placeholder {
+  color: #52525b;
+}
+
+.filterInput:focus {
+  border-color: #7c3aed;
+}
+
+.issueListScroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Status group */
+.statusGroup {
+  border-bottom: 1px solid #1a1a1e;
+}
+
+.statusGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717a;
+  transition: background 0.1s;
+}
+
+.statusGroupHeader:hover {
+  background: #18181b;
+}
+
+.statusGroupCount {
+  font-size: 10px;
+  color: #52525b;
+  font-weight: 500;
+  background: #18181b;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.statusGroupChevron {
+  font-size: 10px;
+  color: #52525b;
+  transition: transform 0.15s;
+}
+
+.statusGroupChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+/* Issue rows */
+.issueRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-left: 3px solid transparent;
+  min-height: 34px;
+}
+
+.issueRow:hover {
+  background: #18181b;
+}
+
+.issueRowSelected {
+  background: #1a1625;
+  border-left-color: #7c3aed;
+}
+
+.issueRowSelected:hover {
+  background: #1e1a2e;
+}
+
+.issueTypeIcon {
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 12px;
+  text-align: center;
+  color: #71717a;
+}
+
+.issueExternalId {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  color: #7c3aed;
+  text-decoration: none;
+  transition: color 0.1s;
+}
+
+.issueExternalId:hover {
+  color: #a78bfa;
+  text-decoration: underline;
+}
+
+.issueTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #d4d4d8;
+}
+
+.priorityDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.priorityCritical { background: #ef4444; }
+.priorityHigh { background: #f97316; }
+.priorityMedium { background: #eab308; }
+.priorityLow { background: #52525b; }
+
+.taskCountPill {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #71717a;
+  background: #18181b;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusInProgress { background: #3b82f6; }
+.statusReview { background: #a78bfa; }
+.statusPlanning { background: #f59e0b; }
+.statusBlocked { background: #ef4444; }
+.statusBacklog { background: #52525b; }
+.statusDone { background: #10b981; }
+.statusAnalysis { background: #f59e0b; }
+
+/* ------------------------------------------------------------------ */
+/* Center Panel — Issue Detail                                         */
+/* ------------------------------------------------------------------ */
+
+.detailPanel {
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: #09090b;
+}
+
+/* Issue header */
+.issueHeader {
+  margin-bottom: 24px;
+}
+
+.issueHeaderTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.externalIdLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #1e1b4b;
+  border: 1px solid #312e81;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  color: #a78bfa;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.externalIdLink:hover {
+  background: #2e1065;
+  border-color: #4c1d95;
+  color: #c4b5fd;
+  text-decoration: underline;
+}
+
+.externalLinkIcon {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.issueTitleLarge {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fafafa;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.issueDescription {
+  font-size: 13px;
+  color: #a1a1aa;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.issueMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.statusBadgeInProgress {
+  background: #172554;
+  color: #60a5fa;
+  border: 1px solid #1e3a5f;
+}
+
+.statusBadgeReview {
+  background: #1e1b4b;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+}
+
+.statusBadgePlanning {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.statusBadgeBlocked {
+  background: #450a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.statusBadgeBacklog {
+  background: #18181b;
+  color: #71717a;
+  border: 1px solid #27272a;
+}
+
+.statusBadgeDone {
+  background: #052e16;
+  color: #4ade80;
+  border: 1px solid #14532d;
+}
+
+.statusBadgeAnalysis {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
+}
+
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.priorityBadgeCritical {
+  background: #450a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.priorityBadgeHigh {
+  background: #431407;
+  color: #fb923c;
+  border: 1px solid #7c2d12;
+}
+
+.priorityBadgeMedium {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.priorityBadgeLow {
+  background: #18181b;
+  color: #71717a;
+  border: 1px solid #27272a;
+}
+
+/* ------------------------------------------------------------------ */
+/* Plan Section                                                        */
+/* ------------------------------------------------------------------ */
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fafafa;
+}
+
+.sectionChevron {
+  font-size: 11px;
+  color: #52525b;
+  transition: transform 0.15s;
+}
+
+.sectionChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.complexityBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.complexityTrivial {
+  background: #18181b;
+  color: #71717a;
+  border: 1px solid #27272a;
+}
+
+.complexitySmall {
+  background: #052e16;
+  color: #4ade80;
+  border: 1px solid #14532d;
+}
+
+.complexityMedium {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.complexityLarge {
+  background: #431407;
+  color: #fb923c;
+  border: 1px solid #7c2d12;
+}
+
+.complexityEpic {
+  background: #450a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.planSummary {
+  font-size: 13px;
+  color: #a1a1aa;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.planSteps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+}
+
+.planStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1a1a1e;
+}
+
+.planStep:last-child {
+  border-bottom: none;
+}
+
+.stepNumber {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: #27272a;
+  color: #a1a1aa;
+}
+
+.stepNumberDone {
+  background: #052e16;
+  color: #4ade80;
+}
+
+.stepNumberActive {
+  background: #172554;
+  color: #60a5fa;
+}
+
+.stepContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: #d4d4d8;
+  margin-bottom: 2px;
+}
+
+.stepRepos {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.repoTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+}
+
+.planRisks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planRisk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: #71717a;
+}
+
+.riskIcon {
+  color: #f59e0b;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tasks Section                                                       */
+/* ------------------------------------------------------------------ */
+
+.tasksSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.taskCount {
+  font-size: 11px;
+  color: #52525b;
+  background: #18181b;
+  padding: 1px 7px;
+  border-radius: 8px;
+}
+
+.taskCard {
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: #0f0f12;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.taskCard:hover {
+  border-color: #3f3f46;
+}
+
+.taskCardFailed {
+  border-color: #7f1d1d;
+}
+
+.taskCardFailed:hover {
+  border-color: #991b1b;
+}
+
+.taskCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.taskStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.taskStatusRunning {
+  background: #172554;
+  color: #60a5fa;
+  border: 1px solid #1e3a5f;
+}
+
+.taskStatusQueued {
+  background: #18181b;
+  color: #a1a1aa;
+  border: 1px solid #27272a;
+}
+
+.taskStatusPlanning {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.taskStatusVerifying {
+  background: #1e1b4b;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+}
+
+.taskStatusReview {
+  background: #1e1b4b;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+}
+
+.taskStatusDone {
+  background: #052e16;
+  color: #4ade80;
+  border: 1px solid #14532d;
+}
+
+.taskStatusFailed {
+  background: #450a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.taskStatusBlocked {
+  background: #450a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.taskTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e4e4e7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #1e1b4b;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+  flex-shrink: 0;
+}
+
+.taskCost {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+  flex-shrink: 0;
+}
+
+.taskExpandIcon {
+  font-size: 10px;
+  color: #52525b;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.taskExpandIconOpen {
+  transform: rotate(90deg);
+}
+
+/* Task body (expanded) */
+.taskBody {
+  padding: 0 14px 14px;
+  border-top: 1px solid #1a1a1e;
+}
+
+.taskDescription {
+  font-size: 12px;
+  color: #a1a1aa;
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+/* Repo info */
+.taskRepos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.taskRepoTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.taskRepoName {
+  font-family: 'JetBrains Mono', monospace;
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+.taskRepoBranch {
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+  font-size: 10px;
+}
+
+.taskRepoDiff {
+  font-size: 10px;
+}
+
+.additions {
+  color: #10b981;
+}
+
+.deletions {
+  color: #ef4444;
+}
+
+/* ------------------------------------------------------------------ */
+/* Verification Pipeline                                               */
+/* ------------------------------------------------------------------ */
+
+.verificationPipeline {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.pipelineStage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.pipelineConnector {
+  width: 12px;
+  height: 1px;
+  background: #27272a;
+  flex-shrink: 0;
+}
+
+.stagePassed {
+  background: #052e16;
+  color: #4ade80;
+  border-color: #14532d;
+}
+
+.stageFailed {
+  background: #450a0a;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
+.stageRunning {
+  background: #172554;
+  color: #60a5fa;
+  border-color: #1e3a5f;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.stageWarning {
+  background: #422006;
+  color: #fbbf24;
+  border-color: #78350f;
+}
+
+.stagePending {
+  background: #18181b;
+  color: #52525b;
+  border-color: #27272a;
+}
+
+.stageSkipped {
+  background: #18181b;
+  color: #3f3f46;
+  border-color: #27272a;
+  text-decoration: line-through;
+}
+
+.stageBlocked {
+  background: #18181b;
+  color: #52525b;
+  border-color: #27272a;
+}
+
+.stageIcon {
+  font-size: 10px;
+}
+
+.stageMetaInline {
+  font-size: 10px;
+  opacity: 0.8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stagePrLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stagePrLink:hover {
+  text-decoration: underline;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Files Changed                                                       */
+/* ------------------------------------------------------------------ */
+
+.filesSection {
+  margin-top: 10px;
+}
+
+.filesToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #71717a;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.filesToggle:hover {
+  color: #a1a1aa;
+}
+
+.filesList {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.fileName {
+  font-family: 'JetBrains Mono', monospace;
+  color: #a1a1aa;
+}
+
+.fileRepoTag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #52525b;
+  background: #18181b;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Task Log Feed                                                       */
+/* ------------------------------------------------------------------ */
+
+.logSection {
+  margin-top: 12px;
+  border-top: 1px solid #1a1a1e;
+  padding-top: 10px;
+}
+
+.logSectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.logFeed {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.logEntry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.logEntry:hover {
+  background: #18181b;
+}
+
+.logTimestamp {
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #3f3f46;
+  min-width: 42px;
+}
+
+.logIcon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.logIconText { color: #71717a; }
+.logIconTool { color: #3b82f6; }
+.logIconResult { color: #10b981; }
+.logIconError { color: #ef4444; }
+.logIconThinking { color: #a78bfa; }
+.logIconMilestone { color: #fbbf24; }
+
+.logContent {
+  flex: 1;
+  color: #a1a1aa;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.logToolName {
+  font-family: 'JetBrains Mono', monospace;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.logRepoTag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #52525b;
+  background: #18181b;
+  padding: 0 3px;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+
+.logContentError {
+  color: #f87171;
+}
+
+.logContentMilestone {
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ */
+/* Empty State                                                         */
+/* ------------------------------------------------------------------ */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #52525b;
+  gap: 12px;
+}
+
+.emptyStateIcon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.emptyStateText {
+  font-size: 14px;
+  color: #71717a;
+}
+
+.analyzeBtn {
+  padding: 8px 16px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 4px;
+}
+
+.analyzeBtn:hover {
+  background: #6d28d9;
+}
+
+/* ------------------------------------------------------------------ */
+/* No selection state                                                  */
+/* ------------------------------------------------------------------ */
+
+.noSelection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #3f3f46;
+  gap: 8px;
+}
+
+.noSelectionIcon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.noSelectionText {
+  font-size: 14px;
+  color: #52525b;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scrollbar                                                           */
+/* ------------------------------------------------------------------ */
+
+.issueListScroll::-webkit-scrollbar,
+.detailPanel::-webkit-scrollbar,
+.logFeed::-webkit-scrollbar {
+  width: 6px;
+}
+
+.issueListScroll::-webkit-scrollbar-track,
+.detailPanel::-webkit-scrollbar-track,
+.logFeed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.issueListScroll::-webkit-scrollbar-thumb,
+.detailPanel::-webkit-scrollbar-thumb,
+.logFeed::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+
+.issueListScroll::-webkit-scrollbar-thumb:hover,
+.detailPanel::-webkit-scrollbar-thumb:hover,
+.logFeed::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
