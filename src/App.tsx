@@ -15,6 +15,7 @@ const StartupCommand = lazy(() => import('./variants/startup-command/StartupComm
 const StartupBrief = lazy(() => import('./variants/startup-brief/StartupBrief'));
 const Ops = lazy(() => import('./variants/ops/Ops'));
 const Kanban = lazy(() => import('./variants/kanban/Kanban'));
+const Metamorph = lazy(() => import('./variants/metamorph/Metamorph'));
 
 const navStyle: React.CSSProperties = {
   display: 'flex',
@@ -91,6 +92,7 @@ export default function App() {
         <span style={separatorStyle} />
         <NavItem to="/ops">Ops</NavItem>
         <NavItem to="/kanban">Kanban</NavItem>
+        <NavItem to="/metamorph">Metamorph</NavItem>
       </nav>
       <Suspense
         fallback={
@@ -114,6 +116,7 @@ export default function App() {
           <Route path="/startup-brief" element={<StartupBrief />} />
           <Route path="/ops" element={<Ops />} />
           <Route path="/kanban" element={<Kanban />} />
+          <Route path="/metamorph" element={<Metamorph />} />
           <Route path="*" element={<Navigate to="/agent-os" replace />} />
         </Routes>
       </Suspense>

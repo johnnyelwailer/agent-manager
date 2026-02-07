@@ -602,6 +602,104 @@ test.describe('Kanban', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Metamorph — 3-panel board + AI plan elaboration
+// ---------------------------------------------------------------------------
+
+test.describe('Metamorph', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/metamorph');
+    await page.waitForSelector('[data-testid="metamorph-shell"]');
+  });
+
+  test('full page — board mode', async ({ page }) => {
+    await expect(page).toHaveScreenshot('metamorph-full.png', ssOpts);
+  });
+
+  test('topbar', async ({ page }) => {
+    const topbar = page.locator('[data-testid="metamorph-topbar"]');
+    await expect(topbar).toHaveScreenshot('metamorph-topbar.png', ssOpts);
+  });
+
+  test('sidebar', async ({ page }) => {
+    const sidebar = page.locator('[data-testid="metamorph-sidebar"]');
+    await expect(sidebar).toHaveScreenshot('metamorph-sidebar.png', ssOpts);
+  });
+
+  test('board', async ({ page }) => {
+    const board = page.locator('[data-testid="metamorph-board"]');
+    await expect(board).toHaveScreenshot('metamorph-board.png', ssOpts);
+  });
+
+  test('detail panel', async ({ page }) => {
+    const detail = page.locator('[data-testid="metamorph-detail"]');
+    await expect(detail).toHaveScreenshot('metamorph-detail.png', ssOpts);
+  });
+
+  test('prompt bar', async ({ page }) => {
+    const bar = page.locator('[data-testid="metamorph-prompt-bar"]');
+    await expect(bar).toHaveScreenshot('metamorph-prompt-bar.png', ssOpts);
+  });
+
+  test('suggestions', async ({ page }) => {
+    const suggestions = page.locator('[data-testid="metamorph-suggestions"]');
+    await expect(suggestions).toHaveScreenshot('metamorph-suggestions.png', ssOpts);
+  });
+
+  test('elaboration mode — plan ready', async ({ page }) => {
+    // Type a prompt and click elaborate
+    const input = page.locator('[data-testid="metamorph-prompt-input"]');
+    await input.fill('Add WebSocket reconnection with exponential backoff');
+    await page.click('text=Elaborate Plan');
+    // Wait for elaboration view to appear and plan to generate
+    await page.waitForSelector('[data-testid="metamorph-elaboration"]');
+    await page.waitForSelector('[data-testid="metamorph-elab-plan"]');
+    // Small wait for mock plan generation
+    await page.waitForTimeout(200);
+    await expect(page).toHaveScreenshot('metamorph-elaboration-full.png', ssOpts);
+  });
+
+  test('elaboration prompt panel', async ({ page }) => {
+    const input = page.locator('[data-testid="metamorph-prompt-input"]');
+    await input.fill('Add WebSocket reconnection with exponential backoff');
+    await page.click('text=Elaborate Plan');
+    await page.waitForSelector('[data-testid="metamorph-elab-prompt"]');
+    await page.waitForTimeout(200);
+    const prompt = page.locator('[data-testid="metamorph-elab-prompt"]');
+    await expect(prompt).toHaveScreenshot('metamorph-elab-prompt.png', ssOpts);
+  });
+
+  test('elaboration plan panel', async ({ page }) => {
+    const input = page.locator('[data-testid="metamorph-prompt-input"]');
+    await input.fill('Add WebSocket reconnection with exponential backoff');
+    await page.click('text=Elaborate Plan');
+    await page.waitForSelector('[data-testid="metamorph-elab-plan"]');
+    await page.waitForTimeout(200);
+    const plan = page.locator('[data-testid="metamorph-elab-plan"]');
+    await expect(plan).toHaveScreenshot('metamorph-elab-plan.png', ssOpts);
+  });
+
+  test('board card', async ({ page }) => {
+    const card = page.locator('[data-testid^="metamorph-card-"]').first();
+    await expect(card).toHaveScreenshot('metamorph-card.png', ssOpts);
+  });
+
+  test('detail plan section', async ({ page }) => {
+    const plan = page.locator('[data-testid="metamorph-detail-plan"]');
+    await expect(plan).toHaveScreenshot('metamorph-detail-plan.png', ssOpts);
+  });
+
+  test('detail tasks section', async ({ page }) => {
+    const tasks = page.locator('[data-testid="metamorph-detail-tasks"]');
+    await expect(tasks).toHaveScreenshot('metamorph-detail-tasks.png', ssOpts);
+  });
+
+  test('agent fleet', async ({ page }) => {
+    const agents = page.locator('[data-testid="metamorph-agents"]');
+    await expect(agents).toHaveScreenshot('metamorph-agents.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
 
