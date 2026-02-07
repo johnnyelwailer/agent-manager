@@ -5,11 +5,13 @@ const CommandCenter = lazy(() => import('./variants/command-center/CommandCenter
 const Flow = lazy(() => import('./variants/flow/Flow'));
 const Spatial = lazy(() => import('./variants/spatial/Spatial'));
 const AgentOS = lazy(() => import('./variants/agent-os/AgentOS'));
+const Hive = lazy(() => import('./variants/hive/Hive'));
+const Pipeline = lazy(() => import('./variants/pipeline/Pipeline'));
 
 const navStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 12,
+  gap: 4,
   padding: '8px 16px',
   background: '#0d1117',
   borderBottom: '1px solid #30363d',
@@ -23,16 +25,17 @@ const logoStyle: React.CSSProperties = {
   color: '#e6edf3',
   fontWeight: 700,
   fontSize: 14,
-  marginRight: 16,
+  marginRight: 12,
   whiteSpace: 'nowrap',
 };
 
 const linkBaseStyle: React.CSSProperties = {
-  padding: '4px 12px',
+  padding: '4px 10px',
   borderRadius: 6,
   textDecoration: 'none',
   color: '#8b949e',
   transition: 'all 0.15s',
+  whiteSpace: 'nowrap',
 };
 
 function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
@@ -56,9 +59,11 @@ export default function App() {
       <nav style={navStyle} data-testid="variant-nav">
         <span style={logoStyle}>Universal Agent Host</span>
         <NavItem to="/agent-os">AgentOS</NavItem>
-        <NavItem to="/command-center">A: Command Center</NavItem>
-        <NavItem to="/flow">B: Flow</NavItem>
-        <NavItem to="/spatial">C: Spatial</NavItem>
+        <NavItem to="/hive">Hive</NavItem>
+        <NavItem to="/pipeline">Pipeline</NavItem>
+        <NavItem to="/command-center">Command Center</NavItem>
+        <NavItem to="/flow">Flow</NavItem>
+        <NavItem to="/spatial">Spatial</NavItem>
       </nav>
       <Suspense
         fallback={
@@ -69,6 +74,8 @@ export default function App() {
       >
         <Routes>
           <Route path="/agent-os" element={<AgentOS />} />
+          <Route path="/hive" element={<Hive />} />
+          <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/command-center" element={<CommandCenter />} />
           <Route path="/flow" element={<Flow />} />
           <Route path="/spatial" element={<Spatial />} />

@@ -56,6 +56,83 @@ test.describe('AgentOS', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Hive — Agent-column kanban
+// ---------------------------------------------------------------------------
+
+test.describe('Hive', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/hive');
+    await page.waitForSelector('[data-testid="hive-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('hive-full.png', ssOpts);
+  });
+
+  test('agent column — running', async ({ page }) => {
+    const col = page.locator('[data-testid="hive-agent-agent-1"]');
+    await expect(col).toHaveScreenshot('hive-agent-running.png', ssOpts);
+  });
+
+  test('agent column — idle', async ({ page }) => {
+    const col = page.locator('[data-testid="hive-agent-agent-2"]');
+    await expect(col).toHaveScreenshot('hive-agent-idle.png', ssOpts);
+  });
+
+  test('unassigned column', async ({ page }) => {
+    const col = page.locator('[data-testid="hive-unassigned"]');
+    await expect(col).toHaveScreenshot('hive-unassigned.png', ssOpts);
+  });
+
+  test('trust badge click cycles', async ({ page }) => {
+    const badge = page.locator('[data-testid="hive-trust-agent-1"]');
+    await expect(badge).toHaveScreenshot('hive-trust-autonomous.png', ssOpts);
+    await badge.click();
+    await expect(badge).toHaveScreenshot('hive-trust-supervised.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pipeline — Stage-gate kanban
+// ---------------------------------------------------------------------------
+
+test.describe('Pipeline', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/pipeline');
+    await page.waitForSelector('[data-testid="pipeline-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('pipeline-full.png', ssOpts);
+  });
+
+  test('backlog stage', async ({ page }) => {
+    const stage = page.locator('[data-testid="pipeline-backlog"]');
+    await expect(stage).toHaveScreenshot('pipeline-backlog.png', ssOpts);
+  });
+
+  test('working stage', async ({ page }) => {
+    const stage = page.locator('[data-testid="pipeline-working"]');
+    await expect(stage).toHaveScreenshot('pipeline-working.png', ssOpts);
+  });
+
+  test('review gate', async ({ page }) => {
+    const stage = page.locator('[data-testid="pipeline-review"]');
+    await expect(stage).toHaveScreenshot('pipeline-review.png', ssOpts);
+  });
+
+  test('review card', async ({ page }) => {
+    const card = page.locator('[data-testid="pipeline-review-card"]').first();
+    await expect(card).toHaveScreenshot('pipeline-review-card.png', ssOpts);
+  });
+
+  test('done stage', async ({ page }) => {
+    const stage = page.locator('[data-testid="pipeline-done"]');
+    await expect(stage).toHaveScreenshot('pipeline-done.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Variant A — Command Center
 // ---------------------------------------------------------------------------
 
@@ -187,20 +264,16 @@ test.describe('Navigation', () => {
   });
 
   test('navigating between variants', async ({ page }) => {
-    await page.goto('/agent-os');
-    await page.waitForSelector('[data-testid="agent-os-shell"]');
-    await expect(page).toHaveScreenshot('nav-agent-os.png', ssOpts);
+    await page.goto('/hive');
+    await page.waitForSelector('[data-testid="hive-shell"]');
+    await expect(page).toHaveScreenshot('nav-hive.png', ssOpts);
 
-    await page.click('text=A: Command Center');
+    await page.click('text=Pipeline');
+    await page.waitForSelector('[data-testid="pipeline-shell"]');
+    await expect(page).toHaveScreenshot('nav-pipeline.png', ssOpts);
+
+    await page.click('text=Command Center');
     await page.waitForSelector('[data-testid="agent-panel"]');
     await expect(page).toHaveScreenshot('nav-command-center.png', ssOpts);
-
-    await page.click('text=B: Flow');
-    await page.waitForSelector('[data-testid="summary-ribbon"]');
-    await expect(page).toHaveScreenshot('nav-flow.png', ssOptsFull);
-
-    await page.click('text=C: Spatial');
-    await page.waitForSelector('[data-testid="spatial-canvas"]');
-    await expect(page).toHaveScreenshot('nav-spatial.png', ssOpts);
   });
 });
