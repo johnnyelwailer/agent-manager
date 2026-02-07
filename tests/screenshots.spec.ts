@@ -4,6 +4,58 @@ const ssOpts = { timeout: 20_000, animations: 'disabled' as const };
 const ssOptsFull = { ...ssOpts, fullPage: true };
 
 // ---------------------------------------------------------------------------
+// AgentOS
+// ---------------------------------------------------------------------------
+
+test.describe('AgentOS', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/agent-os');
+    await page.waitForSelector('[data-testid="agent-os-shell"]');
+  });
+
+  test('full page — task board', async ({ page }) => {
+    await expect(page).toHaveScreenshot('agent-os-taskboard-full.png', ssOpts);
+  });
+
+  test('sidebar', async ({ page }) => {
+    const sidebar = page.locator('[data-testid="agent-os-sidebar"]');
+    await expect(sidebar).toHaveScreenshot('agent-os-sidebar.png', ssOpts);
+  });
+
+  test('task board', async ({ page }) => {
+    const board = page.locator('[data-testid="agent-os-taskboard"]');
+    await expect(board).toHaveScreenshot('agent-os-taskboard.png', ssOpts);
+  });
+
+  test('agent console', async ({ page }) => {
+    const console_ = page.locator('[data-testid="agent-os-console"]');
+    await expect(console_).toHaveScreenshot('agent-os-console.png', ssOpts);
+  });
+
+  test('generative widget', async ({ page }) => {
+    const widget = page.locator('[data-testid="agent-os-gen-widget"]');
+    await expect(widget).toHaveScreenshot('agent-os-gen-widget.png', ssOpts);
+  });
+
+  test('magic input', async ({ page }) => {
+    const input = page.locator('[data-testid="agent-os-magic-input"]');
+    await expect(input).toHaveScreenshot('agent-os-magic-input.png', ssOpts);
+  });
+
+  test('plan view', async ({ page }) => {
+    await page.click('text=Plan View');
+    await page.waitForSelector('[data-testid="agent-os-planview"]');
+    await expect(page).toHaveScreenshot('agent-os-planview-full.png', ssOpts);
+  });
+
+  test('plan view content', async ({ page }) => {
+    await page.click('text=Plan View');
+    const plan = page.locator('[data-testid="agent-os-planview"]');
+    await expect(plan).toHaveScreenshot('agent-os-planview.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Variant A — Command Center
 // ---------------------------------------------------------------------------
 
@@ -128,14 +180,18 @@ test.describe('Variant C: Spatial', () => {
 
 test.describe('Navigation', () => {
   test('variant nav bar', async ({ page }) => {
-    await page.goto('/command-center');
+    await page.goto('/agent-os');
     await page.waitForSelector('[data-testid="variant-nav"]');
     const nav = page.locator('[data-testid="variant-nav"]');
     await expect(nav).toHaveScreenshot('variant-nav.png', ssOpts);
   });
 
   test('navigating between variants', async ({ page }) => {
-    await page.goto('/command-center');
+    await page.goto('/agent-os');
+    await page.waitForSelector('[data-testid="agent-os-shell"]');
+    await expect(page).toHaveScreenshot('nav-agent-os.png', ssOpts);
+
+    await page.click('text=A: Command Center');
     await page.waitForSelector('[data-testid="agent-panel"]');
     await expect(page).toHaveScreenshot('nav-command-center.png', ssOpts);
 

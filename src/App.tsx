@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react';
 const CommandCenter = lazy(() => import('./variants/command-center/CommandCenter'));
 const Flow = lazy(() => import('./variants/flow/Flow'));
 const Spatial = lazy(() => import('./variants/spatial/Spatial'));
+const AgentOS = lazy(() => import('./variants/agent-os/AgentOS'));
 
 const navStyle: React.CSSProperties = {
   display: 'flex',
@@ -54,6 +55,7 @@ export default function App() {
     <BrowserRouter>
       <nav style={navStyle} data-testid="variant-nav">
         <span style={logoStyle}>Universal Agent Host</span>
+        <NavItem to="/agent-os">AgentOS</NavItem>
         <NavItem to="/command-center">A: Command Center</NavItem>
         <NavItem to="/flow">B: Flow</NavItem>
         <NavItem to="/spatial">C: Spatial</NavItem>
@@ -66,10 +68,11 @@ export default function App() {
         }
       >
         <Routes>
+          <Route path="/agent-os" element={<AgentOS />} />
           <Route path="/command-center" element={<CommandCenter />} />
           <Route path="/flow" element={<Flow />} />
           <Route path="/spatial" element={<Spatial />} />
-          <Route path="*" element={<Navigate to="/command-center" replace />} />
+          <Route path="*" element={<Navigate to="/agent-os" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
