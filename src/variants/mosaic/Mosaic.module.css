@@ -1,0 +1,894 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ─── Shell ─────────────────────────────────────────────────────────── */
+
+.shell {
+  height: calc(100vh - 37px);
+  background: #09090b;
+  color: #e4e4e7;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+/* ─── Header ────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  background: #09090b;
+  z-index: 10;
+}
+
+.headerTitle {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fafafa;
+  white-space: nowrap;
+}
+
+.headerCenter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+  max-width: 400px;
+  margin: 0 24px;
+}
+
+.progressBarOuter {
+  flex: 1;
+  height: 14px;
+  background: rgba(63, 63, 70, 0.5);
+  border-radius: 7px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressBarInner {
+  height: 100%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.progressLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a1a1aa;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.costBadge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.agentCountBadge {
+  font-size: 12px;
+  font-weight: 500;
+  color: #a1a1aa;
+}
+
+/* ─── Card Grid ─────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* ─── Card Base ─────────────────────────────────────────────────────── */
+
+.card {
+  background: rgba(24, 24, 27, 0.7);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.cardIcon {
+  font-size: 12px;
+  color: #7c3aed;
+  width: 16px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.cardTitle {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #71717a;
+}
+
+.cardBody {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Wide card spans 2 columns on row 3 */
+.cardWide {
+  grid-column: span 2;
+}
+
+/* ─── Card 1: Strategy Map ──────────────────────────────────────────── */
+
+.strategyPhase {
+  margin-bottom: 10px;
+}
+
+.phaseToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+.phaseArrow {
+  font-size: 10px;
+  color: #71717a;
+  transition: transform 0.2s ease;
+  width: 12px;
+  display: inline-block;
+}
+
+.phaseArrowOpen {
+  transform: rotate(90deg);
+}
+
+.phaseTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.phaseProgress {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #71717a;
+  margin-left: auto;
+}
+
+.strategyChildren {
+  padding-left: 18px;
+}
+
+.strategyItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.strategyNested {
+  padding-left: 14px;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotCompleted {
+  background: #10b981;
+}
+
+.dotActive {
+  background: #f59e0b;
+}
+
+.dotDraft {
+  background: #52525b;
+}
+
+.dotAbandoned {
+  background: #ef4444;
+}
+
+.strategyLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assigneeTag {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.miniProgressOuter {
+  width: 40px;
+  height: 4px;
+  background: rgba(63, 63, 70, 0.5);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.miniProgressInner {
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 2px;
+}
+
+/* ─── Card 2: Agent Fleet ───────────────────────────────────────────── */
+
+.agentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.agentTile {
+  background: rgba(39, 39, 42, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.avatarCircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fafafa;
+  background: rgba(63, 63, 70, 0.7);
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.ringRunning {
+  border-color: #10b981;
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+.ringIdle {
+  border-color: #52525b;
+}
+
+.ringErrored {
+  border-color: #ef4444;
+}
+
+.ringPaused {
+  border-color: #f59e0b;
+}
+
+@keyframes pulse-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+.agentTileName {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.agentTileModel {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+}
+
+.agentTileStatus {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.statusRunning {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.statusIdle {
+  color: #71717a;
+  background: rgba(113, 113, 122, 0.1);
+}
+
+.statusErrored {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.statusPaused {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.agentTileTask {
+  font-size: 9px;
+  color: #a1a1aa;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentTileError {
+  font-size: 9px;
+  color: #ef4444;
+}
+
+.fleetFooter {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(63, 63, 70, 0.3);
+}
+
+/* ─── Card 3: Active Work ───────────────────────────────────────────── */
+
+.activeCount {
+  font-size: 10px;
+  color: #71717a;
+  margin-bottom: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.miniTaskCard {
+  border-left: 3px solid;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 0 6px 6px 0;
+  background: rgba(39, 39, 42, 0.4);
+}
+
+.miniTaskRunning {
+  border-left-color: #10b981;
+}
+
+.miniTaskQueued {
+  border-left-color: #52525b;
+}
+
+.miniTaskPaused {
+  border-left-color: #f59e0b;
+}
+
+.miniTaskFailed {
+  border-left-color: #ef4444;
+}
+
+.miniTaskTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4d4d8;
+  margin-bottom: 2px;
+}
+
+.miniTaskAgent {
+  font-size: 9px;
+  color: #a78bfa;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+
+.miniTaskStream {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #a1a1aa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.miniTaskLabel {
+  font-size: 10px;
+  color: #52525b;
+  font-style: italic;
+}
+
+/* ─── Card 4: Review Queue ──────────────────────────────────────────── */
+
+.reviewItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.2);
+}
+
+.reviewItem:last-child {
+  border-bottom: none;
+}
+
+.reviewDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.reviewContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.reviewTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4d4d8;
+  margin-bottom: 2px;
+}
+
+.reviewDesc {
+  font-size: 10px;
+  color: #a1a1aa;
+  margin-bottom: 4px;
+}
+
+.reviewTypeBadge {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.reviewAction {
+  font-size: 9px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-family: inherit;
+}
+
+.reviewAction:hover {
+  background: rgba(124, 58, 237, 0.2);
+}
+
+.allClear {
+  font-size: 12px;
+  color: #10b981;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ─── Card 5: Verification Matrix ───────────────────────────────────── */
+
+.verTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.verTable th {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #71717a;
+  padding: 4px 8px;
+  text-align: center;
+  font-size: 9px;
+}
+
+.verTable th:first-child {
+  text-align: left;
+}
+
+.verTable td {
+  padding: 5px 8px;
+  text-align: center;
+  border-top: 1px solid rgba(63, 63, 70, 0.2);
+}
+
+.verTable td:first-child {
+  text-align: left;
+  color: #a1a1aa;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.verDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.verPassed {
+  background: #10b981;
+}
+
+.verFailed {
+  background: #ef4444;
+}
+
+.verNeedsReview {
+  background: #f59e0b;
+}
+
+.verPending {
+  background: #52525b;
+}
+
+.verNA {
+  background: transparent;
+}
+
+.verSummary {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(63, 63, 70, 0.3);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+}
+
+.verSumPassed {
+  color: #10b981;
+}
+
+.verSumFailed {
+  color: #ef4444;
+}
+
+.verSumPending {
+  color: #a1a1aa;
+}
+
+/* ─── Card 6: Cost Breakdown ────────────────────────────────────────── */
+
+.costBarContainer {
+  margin-bottom: 12px;
+}
+
+.costBarTrack {
+  display: flex;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(63, 63, 70, 0.3);
+}
+
+.costBarSegment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: #fafafa;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+  transition: flex 0.3s ease;
+}
+
+.costBarSegment:nth-child(1) {
+  background: #7c3aed;
+}
+
+.costBarSegment:nth-child(2) {
+  background: #2563eb;
+}
+
+.costBarSegment:nth-child(3) {
+  background: #0891b2;
+}
+
+.costLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.costLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #a1a1aa;
+}
+
+.costLegendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.costLegendDot:nth-child(1) {
+  /* parent sets color */
+}
+
+.costSectionLabel {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52525b;
+  margin: 10px 0 6px;
+}
+
+.costPhaseRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  padding: 3px 0;
+  color: #a1a1aa;
+}
+
+.costPhaseAmount {
+  font-family: 'JetBrains Mono', monospace;
+  color: #d4d4d8;
+}
+
+.costTotal {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(63, 63, 70, 0.3);
+  color: #fafafa;
+}
+
+.costTotalAmount {
+  font-family: 'JetBrains Mono', monospace;
+  color: #10b981;
+}
+
+/* ─── Card 7: File Activity ─────────────────────────────────────────── */
+
+.fileGroup {
+  margin-bottom: 10px;
+}
+
+.fileGroupLabel {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52525b;
+  margin-bottom: 4px;
+}
+
+.fileEntry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 10px;
+}
+
+.fileIcon {
+  color: #7c3aed;
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.filePath {
+  font-family: 'JetBrains Mono', monospace;
+  color: #a1a1aa;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileTime {
+  font-size: 9px;
+  color: #52525b;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Card 8: Context Library ───────────────────────────────────────── */
+
+.contextGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.contextItem {
+  background: rgba(39, 39, 42, 0.4);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.contextItemHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.contextDocIcon {
+  color: #7c3aed;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 1px;
+}
+
+.contextItemTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.contextSource {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+  margin-bottom: 6px;
+}
+
+.contextTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.contextTag {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.tagArchitecture {
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+}
+
+.tagSdk {
+  background: rgba(37, 99, 235, 0.12);
+  color: #60a5fa;
+}
+
+.tagProtocol {
+  background: rgba(8, 145, 178, 0.12);
+  color: #22d3ee;
+}
+
+.tagConcurrency {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.tagDefault {
+  background: rgba(63, 63, 70, 0.3);
+  color: #a1a1aa;
+}
+
+.contextTime {
+  font-size: 9px;
+  color: #52525b;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────── */
+
+.cardBody::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cardBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cardBody::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.5);
+  border-radius: 2px;
+}
+
+.shell::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shell::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.5);
+  border-radius: 3px;
+}

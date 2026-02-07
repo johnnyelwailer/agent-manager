@@ -1,0 +1,770 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Keyframes ── */
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Shell ── */
+
+.shell {
+  height: calc(100vh - 37px);
+  display: grid;
+  grid-template-rows: 48px 1fr 32px;
+  grid-template-columns: 260px 1fr 300px;
+  background: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+}
+
+/* ── Metrics Bar (top, spans all columns) ── */
+
+.metricsBar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 16px;
+  background: #0a0a0c;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.metricTile {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 100%;
+  border-right: 1px solid rgba(63, 63, 70, 0.25);
+}
+
+.metricTile:last-child {
+  border-right: none;
+}
+
+.metricLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #52525b;
+  white-space: nowrap;
+}
+
+.metricValue {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: #e4e4e7;
+  white-space: nowrap;
+}
+
+.metricValueGreen {
+  color: #10b981;
+}
+
+.metricValueAmber {
+  color: #f59e0b;
+}
+
+.metricValuePurple {
+  color: #a78bfa;
+}
+
+.metricDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.metricDotGreen {
+  background: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+.metricDotAmber {
+  background: #f59e0b;
+}
+
+/* ── Left Column (fleet + verification wall) ── */
+
+.leftColumn {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(63, 63, 70, 0.4);
+  overflow: hidden;
+}
+
+/* ── Agent Fleet Panel ── */
+
+.fleetPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.4);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #71717a;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.25);
+  flex-shrink: 0;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+.countBadge {
+  margin-left: auto;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fleetList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px;
+}
+
+.agentCard {
+  padding: 10px 10px;
+  margin-bottom: 4px;
+  background: rgba(24, 24, 27, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.3);
+  border-radius: 8px;
+  animation: fadeIn 0.2s ease;
+  transition: border-color 0.15s ease;
+}
+
+.agentCard:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+.agentCardErrored {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.agentCardRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusDotRunning {
+  background: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+.statusDotIdle {
+  background: #52525b;
+}
+
+.statusDotErrored {
+  background: #ef4444;
+}
+
+.statusDotPaused {
+  background: #f59e0b;
+}
+
+.agentCardName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e4e4e7;
+}
+
+.agentCardModel {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+  margin-left: auto;
+}
+
+.agentCardTask {
+  font-size: 11px;
+  color: #a1a1aa;
+  margin-top: 4px;
+  padding-left: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agentCardStats {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  padding-left: 16px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+}
+
+.agentMiniStream {
+  margin-top: 6px;
+  margin-left: 16px;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #10b981;
+  background: rgba(9, 9, 11, 0.6);
+  border-left: 2px solid #10b981;
+  border-radius: 0 4px 4px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+.agentMiniStreamPulse {
+  border-left-color: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+.errorIcon {
+  color: #ef4444;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* ── Verification Wall ── */
+
+.verificationPanel {
+  flex: 0 0 auto;
+  min-height: 140px;
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.verificationGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.verBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  background: rgba(24, 24, 27, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.3);
+  border-radius: 6px;
+  transition: border-color 0.15s ease;
+  cursor: default;
+}
+
+.verBadge:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.verIcon {
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.verIconPassed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.verIconFailed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.verIconNeedsReview {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.verIconPending {
+  background: rgba(113, 113, 122, 0.12);
+  color: #71717a;
+}
+
+.verLabel {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #71717a;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── Execution Timeline (center) ── */
+
+.timelinePanel {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid rgba(63, 63, 70, 0.4);
+}
+
+.timelineBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.swimlanes {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.swimlane {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.15);
+}
+
+.swimlaneLabel {
+  width: 90px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a1a1aa;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.swimlaneTrack {
+  flex: 1;
+  height: 28px;
+  position: relative;
+  border-radius: 4px;
+  background: rgba(24, 24, 27, 0.3);
+}
+
+.execBlock {
+  position: absolute;
+  top: 2px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #e4e4e7;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 24px;
+}
+
+.execBlockCompleted {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.execBlockRunning {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+}
+
+.execBlockFailed {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.execBlockPaused {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px dashed rgba(245, 158, 11, 0.5);
+}
+
+.execBlockQueued {
+  background: rgba(113, 113, 122, 0.15);
+  border: 1px solid rgba(113, 113, 122, 0.3);
+}
+
+.nowMarker {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #7c3aed;
+  z-index: 2;
+}
+
+.nowMarkerLabel {
+  position: absolute;
+  right: -8px;
+  top: -18px;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #7c3aed;
+  white-space: nowrap;
+}
+
+/* ── Event Feed (below swimlanes) ── */
+
+.eventFeed {
+  flex: 0 0 auto;
+  max-height: 180px;
+  border-top: 1px solid rgba(63, 63, 70, 0.3);
+  overflow-y: auto;
+  padding: 6px 12px;
+}
+
+.eventFeedTitle {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #52525b;
+  padding: 4px 4px 6px;
+}
+
+.eventRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.1);
+}
+
+.eventTime {
+  flex-shrink: 0;
+  width: 48px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #52525b;
+}
+
+.eventType {
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.eventTypeCall {
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+}
+
+.eventTypeResult {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.eventTypeError {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.eventContent {
+  flex: 1;
+  color: #a1a1aa;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── Attention Queue (right) ── */
+
+.attentionPanel {
+  grid-column: 3;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.attentionList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.attentionItem {
+  padding: 10px 10px;
+  margin-bottom: 6px;
+  background: rgba(24, 24, 27, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.3);
+  border-radius: 8px;
+  border-left-width: 3px;
+  animation: fadeIn 0.25s ease;
+}
+
+.attentionItemError {
+  border-left-color: #ef4444;
+}
+
+.attentionItemReview {
+  border-left-color: #f59e0b;
+}
+
+.attentionItemApproval {
+  border-left-color: #7c3aed;
+}
+
+.attentionItemBlocked {
+  border-left-color: #52525b;
+}
+
+.attentionIcon {
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.attentionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e4e4e7;
+  display: flex;
+  align-items: center;
+}
+
+.attentionDesc {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.attentionTime {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #3f3f46;
+  margin-top: 6px;
+}
+
+.attentionActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btnDanger {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  transition: background 0.15s;
+}
+
+.btnDanger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.btnSecondary {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(63, 63, 70, 0.4);
+  background: rgba(24, 24, 27, 0.6);
+  color: #a1a1aa;
+  transition: background 0.15s;
+}
+
+.btnSecondary:hover {
+  background: rgba(63, 63, 70, 0.3);
+}
+
+.btnAmber {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  transition: background 0.15s;
+}
+
+.btnAmber:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.btnPrimary {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+  transition: background 0.15s;
+}
+
+.btnPrimary:hover {
+  background: rgba(124, 58, 237, 0.25);
+}
+
+/* ── Alert Bar (bottom, spans all columns) ── */
+
+.alertBar {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: #0a0a0c;
+  border-top: 1px solid rgba(63, 63, 70, 0.5);
+  font-size: 11px;
+  gap: 12px;
+}
+
+.alertLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f87171;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.alertCenter {
+  flex: 1;
+  text-align: center;
+  color: #52525b;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.alertRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.alertDotOk {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.alertDotError {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+/* ── Scrollbar styling ── */
+
+.fleetList::-webkit-scrollbar,
+.verificationGrid::-webkit-scrollbar,
+.swimlanes::-webkit-scrollbar,
+.eventFeed::-webkit-scrollbar,
+.attentionList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fleetList::-webkit-scrollbar-track,
+.verificationGrid::-webkit-scrollbar-track,
+.swimlanes::-webkit-scrollbar-track,
+.eventFeed::-webkit-scrollbar-track,
+.attentionList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fleetList::-webkit-scrollbar-thumb,
+.verificationGrid::-webkit-scrollbar-thumb,
+.swimlanes::-webkit-scrollbar-thumb,
+.eventFeed::-webkit-scrollbar-thumb,
+.attentionList::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.4);
+  border-radius: 2px;
+}
+
+/* ── Glassmorphism panel borders ── */
+
+.fleetPanel,
+.verificationPanel,
+.timelinePanel,
+.attentionPanel {
+  background: rgba(9, 9, 11, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

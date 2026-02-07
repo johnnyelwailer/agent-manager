@@ -1,0 +1,511 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Keyframes ── */
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Shell ── */
+
+.shell {
+  height: calc(100vh - 37px);
+  display: flex;
+  flex-direction: column;
+  background: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+}
+
+/* ── Welcome Header ── */
+
+.welcomeHeader {
+  padding: 24px 32px 20px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.4);
+  flex-shrink: 0;
+}
+
+.welcomeTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fafafa;
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.welcomeSummary {
+  font-size: 13px;
+  color: #71717a;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summarySeparator {
+  color: #3f3f46;
+}
+
+.summaryHighlight {
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+.summaryCost {
+  color: #a78bfa;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+/* ── Content Grid ── */
+
+.contentGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Card base ── */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid rgba(63, 63, 70, 0.3);
+}
+
+.card:last-child {
+  border-right: none;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #71717a;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.25);
+  flex-shrink: 0;
+}
+
+.cardBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.cardBody::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cardBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cardBody::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.4);
+  border-radius: 2px;
+}
+
+/* ── Badge ── */
+
+.countBadge {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+/* ── Recent Tasks ── */
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  animation: fadeIn 0.2s ease;
+}
+
+.taskItem:hover {
+  background: rgba(63, 63, 70, 0.2);
+}
+
+.taskStatusIcon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.taskStatusCompleted {
+  color: #10b981;
+}
+
+.taskStatusRunning {
+  color: #10b981;
+  animation: pulseGlow 1.5s infinite;
+}
+
+.taskStatusQueued {
+  color: #52525b;
+}
+
+.taskStatusFailed {
+  color: #ef4444;
+}
+
+.taskStatusPaused {
+  color: #f59e0b;
+}
+
+.taskInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e4e4e7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taskMeta {
+  font-size: 11px;
+  color: #52525b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.taskAgent {
+  color: #71717a;
+}
+
+.taskTime {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+/* ── Agent Activity ── */
+
+.agentSection {
+  padding: 14px 10px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.2);
+  animation: fadeIn 0.2s ease;
+}
+
+.agentSection:last-child {
+  border-bottom: none;
+}
+
+.agentHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.agentAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fafafa;
+  flex-shrink: 0;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.agentAvatarRunning {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+}
+
+.agentAvatarIdle {
+  background: rgba(82, 82, 91, 0.2);
+  border-color: #52525b;
+}
+
+.agentAvatarErrored {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+.agentNameGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+.agentName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4e7;
+}
+
+.agentModel {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+}
+
+.agentStatusLabel {
+  font-size: 12px;
+  color: #a1a1aa;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.agentStatusLabelError {
+  color: #f87171;
+}
+
+.agentStream {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #34d399;
+  background: rgba(9, 9, 11, 0.6);
+  border-left: 2px solid #10b981;
+  border-radius: 0 4px 4px 0;
+  padding: 4px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agentStats {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+}
+
+/* ── Strategy Progress ── */
+
+.strategyPhase {
+  padding: 14px 10px;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.2);
+  animation: fadeIn 0.2s ease;
+}
+
+.strategyPhase:last-child {
+  border-bottom: none;
+}
+
+.phaseHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.phaseName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4e7;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phaseBadge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.phaseBadgeActive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.phaseBadgeDraft {
+  background: rgba(82, 82, 91, 0.15);
+  color: #71717a;
+}
+
+.progressBarTrack {
+  width: 100%;
+  height: 6px;
+  background: rgba(63, 63, 70, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  transition: width 0.4s ease;
+}
+
+.childList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.childItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.childDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.childDotCompleted {
+  background: #10b981;
+}
+
+.childDotActive {
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.childDotDraft {
+  background: #3f3f46;
+}
+
+.childLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progressFraction {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #52525b;
+  flex-shrink: 0;
+}
+
+/* ── Quick Actions Bar ── */
+
+.actionsBar {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(63, 63, 70, 0.4);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(9, 9, 11, 0.6);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.actionBtnIcon {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.actionBtnPrimary {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fafafa;
+  border: 1px solid rgba(124, 58, 237, 0.6);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+}
+
+.actionBtnPrimary:hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+}
+
+.actionBtnOutline {
+  background: transparent;
+  color: #a1a1aa;
+  border: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.actionBtnOutline:hover {
+  background: rgba(63, 63, 70, 0.2);
+  color: #e4e4e7;
+  border-color: rgba(63, 63, 70, 0.8);
+}
+
+.reviewBadge {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  padding: 1px 7px;
+  border-radius: 8px;
+  margin-left: 2px;
+}

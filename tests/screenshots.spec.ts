@@ -133,6 +133,261 @@ test.describe('Pipeline', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Nerve Center — Monitoring dashboard
+// ---------------------------------------------------------------------------
+
+test.describe('Nerve Center', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/nerve-center');
+    await page.waitForSelector('[data-testid="nerve-center-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('nerve-center-full.png', ssOpts);
+  });
+
+  test('metrics bar', async ({ page }) => {
+    const bar = page.locator('[data-testid="nerve-center-metrics"]');
+    await expect(bar).toHaveScreenshot('nerve-center-metrics.png', ssOpts);
+  });
+
+  test('agent fleet', async ({ page }) => {
+    const fleet = page.locator('[data-testid="nerve-center-fleet"]');
+    await expect(fleet).toHaveScreenshot('nerve-center-fleet.png', ssOpts);
+  });
+
+  test('verification wall', async ({ page }) => {
+    const wall = page.locator('[data-testid="nerve-center-verifications"]');
+    await expect(wall).toHaveScreenshot('nerve-center-verifications.png', ssOpts);
+  });
+
+  test('execution timeline', async ({ page }) => {
+    const timeline = page.locator('[data-testid="nerve-center-timeline"]');
+    await expect(timeline).toHaveScreenshot('nerve-center-timeline.png', ssOpts);
+  });
+
+  test('attention queue', async ({ page }) => {
+    const queue = page.locator('[data-testid="nerve-center-attention"]');
+    await expect(queue).toHaveScreenshot('nerve-center-attention.png', ssOpts);
+  });
+
+  test('alert bar', async ({ page }) => {
+    const bar = page.locator('[data-testid="nerve-center-alerts"]');
+    await expect(bar).toHaveScreenshot('nerve-center-alerts.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mosaic — Strategic overview radiator
+// ---------------------------------------------------------------------------
+
+test.describe('Mosaic', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/mosaic');
+    await page.waitForSelector('[data-testid="mosaic-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('mosaic-full.png', ssOptsFull);
+  });
+
+  test('header', async ({ page }) => {
+    const header = page.locator('[data-testid="mosaic-header"]');
+    await expect(header).toHaveScreenshot('mosaic-header.png', ssOpts);
+  });
+
+  test('strategy card', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-strategy"]');
+    await expect(card).toHaveScreenshot('mosaic-strategy.png', ssOpts);
+  });
+
+  test('agent fleet card', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-agents"]');
+    await expect(card).toHaveScreenshot('mosaic-agents.png', ssOpts);
+  });
+
+  test('active work card', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-active"]');
+    await expect(card).toHaveScreenshot('mosaic-active.png', ssOpts);
+  });
+
+  test('review queue card', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-reviews"]');
+    await expect(card).toHaveScreenshot('mosaic-reviews.png', ssOpts);
+  });
+
+  test('verification matrix', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-verifications"]');
+    await expect(card).toHaveScreenshot('mosaic-verifications.png', ssOpts);
+  });
+
+  test('cost breakdown', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-cost"]');
+    await expect(card).toHaveScreenshot('mosaic-cost.png', ssOpts);
+  });
+
+  test('file activity', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-files"]');
+    await expect(card).toHaveScreenshot('mosaic-files.png', ssOpts);
+  });
+
+  test('context library', async ({ page }) => {
+    const card = page.locator('[data-testid="mosaic-context"]');
+    await expect(card).toHaveScreenshot('mosaic-context.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Startup: Chat First
+// ---------------------------------------------------------------------------
+
+test.describe('Startup: Chat', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/startup-chat');
+    await page.waitForSelector('[data-testid="startup-chat-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('startup-chat-full.png', ssOpts);
+  });
+
+  test('hero area', async ({ page }) => {
+    const hero = page.locator('[data-testid="startup-chat-hero"]');
+    await expect(hero).toHaveScreenshot('startup-chat-hero.png', ssOpts);
+  });
+
+  test('action chips', async ({ page }) => {
+    const actions = page.locator('[data-testid="startup-chat-actions"]');
+    await expect(actions).toHaveScreenshot('startup-chat-actions.png', ssOpts);
+  });
+
+  test('chat input', async ({ page }) => {
+    const input = page.locator('[data-testid="startup-chat-input"]');
+    await expect(input).toHaveScreenshot('startup-chat-input.png', ssOpts);
+  });
+
+  test('recent tasks', async ({ page }) => {
+    const recent = page.locator('[data-testid="startup-chat-recent"]');
+    await expect(recent).toHaveScreenshot('startup-chat-recent.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Startup: Dashboard Home
+// ---------------------------------------------------------------------------
+
+test.describe('Startup: Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/startup-dashboard');
+    await page.waitForSelector('[data-testid="startup-dashboard-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('startup-dashboard-full.png', ssOpts);
+  });
+
+  test('welcome header', async ({ page }) => {
+    const header = page.locator('[data-testid="startup-dashboard-welcome"]');
+    await expect(header).toHaveScreenshot('startup-dashboard-welcome.png', ssOpts);
+  });
+
+  test('recent tasks', async ({ page }) => {
+    const tasks = page.locator('[data-testid="startup-dashboard-tasks"]');
+    await expect(tasks).toHaveScreenshot('startup-dashboard-tasks.png', ssOpts);
+  });
+
+  test('agent activity', async ({ page }) => {
+    const agents = page.locator('[data-testid="startup-dashboard-agents"]');
+    await expect(agents).toHaveScreenshot('startup-dashboard-agents.png', ssOpts);
+  });
+
+  test('strategy progress', async ({ page }) => {
+    const strategy = page.locator('[data-testid="startup-dashboard-strategy"]');
+    await expect(strategy).toHaveScreenshot('startup-dashboard-strategy.png', ssOpts);
+  });
+
+  test('quick actions', async ({ page }) => {
+    const actions = page.locator('[data-testid="startup-dashboard-actions"]');
+    await expect(actions).toHaveScreenshot('startup-dashboard-actions.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Startup: Command Palette
+// ---------------------------------------------------------------------------
+
+test.describe('Startup: Command', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/startup-command');
+    await page.waitForSelector('[data-testid="startup-command-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('startup-command-full.png', ssOpts);
+  });
+
+  test('command input', async ({ page }) => {
+    const input = page.locator('[data-testid="startup-command-input"]');
+    await expect(input).toHaveScreenshot('startup-command-input.png', ssOpts);
+  });
+
+  test('results panel', async ({ page }) => {
+    const results = page.locator('[data-testid="startup-command-results"]');
+    await expect(results).toHaveScreenshot('startup-command-results.png', ssOpts);
+  });
+
+  test('keyboard hints', async ({ page }) => {
+    const hints = page.locator('[data-testid="startup-command-hints"]');
+    await expect(hints).toHaveScreenshot('startup-command-hints.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Startup: Mission Brief
+// ---------------------------------------------------------------------------
+
+test.describe('Startup: Brief', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/startup-brief');
+    await page.waitForSelector('[data-testid="startup-brief-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('startup-brief-full.png', ssOpts);
+  });
+
+  test('brief content', async ({ page }) => {
+    const content = page.locator('[data-testid="startup-brief-content"]');
+    await expect(content).toHaveScreenshot('startup-brief-content.png', ssOptsFull);
+  });
+
+  test('session summary', async ({ page }) => {
+    const summary = page.locator('[data-testid="startup-brief-summary"]');
+    await expect(summary).toHaveScreenshot('startup-brief-summary.png', ssOpts);
+  });
+
+  test('attention section', async ({ page }) => {
+    const attention = page.locator('[data-testid="startup-brief-attention"]');
+    await expect(attention).toHaveScreenshot('startup-brief-attention.png', ssOpts);
+  });
+
+  test('strategy progress', async ({ page }) => {
+    const strategy = page.locator('[data-testid="startup-brief-strategy"]');
+    await expect(strategy).toHaveScreenshot('startup-brief-strategy.png', ssOpts);
+  });
+
+  test('quick actions', async ({ page }) => {
+    const actions = page.locator('[data-testid="startup-brief-actions"]');
+    await expect(actions).toHaveScreenshot('startup-brief-actions.png', ssOpts);
+  });
+
+  test('chat panel', async ({ page }) => {
+    const chat = page.locator('[data-testid="startup-brief-chat"]');
+    await expect(chat).toHaveScreenshot('startup-brief-chat.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Variant A — Command Center
 // ---------------------------------------------------------------------------
 
@@ -264,16 +519,16 @@ test.describe('Navigation', () => {
   });
 
   test('navigating between variants', async ({ page }) => {
-    await page.goto('/hive');
-    await page.waitForSelector('[data-testid="hive-shell"]');
-    await expect(page).toHaveScreenshot('nav-hive.png', ssOpts);
+    await page.goto('/nerve-center');
+    await page.waitForSelector('[data-testid="nerve-center-shell"]');
+    await expect(page).toHaveScreenshot('nav-nerve-center.png', ssOpts);
 
-    await page.click('text=Pipeline');
-    await page.waitForSelector('[data-testid="pipeline-shell"]');
-    await expect(page).toHaveScreenshot('nav-pipeline.png', ssOpts);
+    await page.click('text=Mosaic');
+    await page.waitForSelector('[data-testid="mosaic-shell"]');
+    await expect(page).toHaveScreenshot('nav-mosaic.png', ssOpts);
 
-    await page.click('text=Command Center');
-    await page.waitForSelector('[data-testid="agent-panel"]');
-    await expect(page).toHaveScreenshot('nav-command-center.png', ssOpts);
+    await page.click('text=Chat');
+    await page.waitForSelector('[data-testid="startup-chat-shell"]');
+    await expect(page).toHaveScreenshot('nav-startup-chat.png', ssOpts);
   });
 });
