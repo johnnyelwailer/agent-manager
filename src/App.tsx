@@ -13,6 +13,8 @@ const StartupChat = lazy(() => import('./variants/startup-chat/StartupChat'));
 const StartupDashboard = lazy(() => import('./variants/startup-dashboard/StartupDashboard'));
 const StartupCommand = lazy(() => import('./variants/startup-command/StartupCommand'));
 const StartupBrief = lazy(() => import('./variants/startup-brief/StartupBrief'));
+const Ops = lazy(() => import('./variants/ops/Ops'));
+const Kanban = lazy(() => import('./variants/kanban/Kanban'));
 
 const navStyle: React.CSSProperties = {
   display: 'flex',
@@ -86,6 +88,9 @@ export default function App() {
         <NavItem to="/startup-dashboard">Dashboard</NavItem>
         <NavItem to="/startup-command">Command</NavItem>
         <NavItem to="/startup-brief">Brief</NavItem>
+        <span style={separatorStyle} />
+        <NavItem to="/ops">Ops</NavItem>
+        <NavItem to="/kanban">Kanban</NavItem>
       </nav>
       <Suspense
         fallback={
@@ -107,6 +112,8 @@ export default function App() {
           <Route path="/startup-dashboard" element={<StartupDashboard />} />
           <Route path="/startup-command" element={<StartupCommand />} />
           <Route path="/startup-brief" element={<StartupBrief />} />
+          <Route path="/ops" element={<Ops />} />
+          <Route path="/kanban" element={<Kanban />} />
           <Route path="*" element={<Navigate to="/agent-os" replace />} />
         </Routes>
       </Suspense>

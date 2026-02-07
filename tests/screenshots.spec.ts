@@ -507,6 +507,101 @@ test.describe('Variant C: Spatial', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Ops — Focused task manager
+// ---------------------------------------------------------------------------
+
+test.describe('Ops', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/ops');
+    await page.waitForSelector('[data-testid="ops-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('ops-full.png', ssOpts);
+  });
+
+  test('topbar', async ({ page }) => {
+    const topbar = page.locator('[data-testid="ops-topbar"]');
+    await expect(topbar).toHaveScreenshot('ops-topbar.png', ssOpts);
+  });
+
+  test('issue list', async ({ page }) => {
+    const list = page.locator('[data-testid="ops-issue-list"]');
+    await expect(list).toHaveScreenshot('ops-issue-list.png', ssOpts);
+  });
+
+  test('issue detail', async ({ page }) => {
+    const detail = page.locator('[data-testid="ops-issue-detail"]');
+    await expect(detail).toHaveScreenshot('ops-issue-detail.png', ssOpts);
+  });
+
+  test('plan section', async ({ page }) => {
+    const plan = page.locator('[data-testid="ops-plan"]');
+    await expect(plan).toHaveScreenshot('ops-plan.png', ssOpts);
+  });
+
+  test('tasks section', async ({ page }) => {
+    const tasks = page.locator('[data-testid="ops-tasks"]');
+    await expect(tasks).toHaveScreenshot('ops-tasks.png', ssOpts);
+  });
+
+  test('verification pipeline', async ({ page }) => {
+    const pipeline = page.locator('[data-testid^="ops-verification-"]').first();
+    await expect(pipeline).toHaveScreenshot('ops-verification.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kanban — Workflow kanban board
+// ---------------------------------------------------------------------------
+
+test.describe('Kanban', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/kanban');
+    await page.waitForSelector('[data-testid="kanban-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('kanban-full.png', ssOpts);
+  });
+
+  test('header', async ({ page }) => {
+    const header = page.locator('[data-testid="kanban-header"]');
+    await expect(header).toHaveScreenshot('kanban-header.png', ssOpts);
+  });
+
+  test('backlog column', async ({ page }) => {
+    const col = page.locator('[data-testid="kanban-col-backlog"]');
+    await expect(col).toHaveScreenshot('kanban-col-backlog.png', ssOpts);
+  });
+
+  test('planning column', async ({ page }) => {
+    const col = page.locator('[data-testid="kanban-col-planning"]');
+    await expect(col).toHaveScreenshot('kanban-col-planning.png', ssOpts);
+  });
+
+  test('progress column', async ({ page }) => {
+    const col = page.locator('[data-testid="kanban-col-progress"]');
+    await expect(col).toHaveScreenshot('kanban-col-progress.png', ssOpts);
+  });
+
+  test('review column', async ({ page }) => {
+    const col = page.locator('[data-testid="kanban-col-review"]');
+    await expect(col).toHaveScreenshot('kanban-col-review.png', ssOpts);
+  });
+
+  test('done column', async ({ page }) => {
+    const col = page.locator('[data-testid="kanban-col-done"]');
+    await expect(col).toHaveScreenshot('kanban-col-done.png', ssOpts);
+  });
+
+  test('issue card', async ({ page }) => {
+    const card = page.locator('[data-testid^="kanban-card-"]').first();
+    await expect(card).toHaveScreenshot('kanban-card.png', ssOpts);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
 
