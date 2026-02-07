@@ -627,3 +627,65 @@ test.describe('Navigation', () => {
     await expect(page).toHaveScreenshot('nav-startup-chat.png', ssOpts);
   });
 });
+
+// ---------------------------------------------------------------------------
+// GSD — Get Shit Done
+// ---------------------------------------------------------------------------
+
+test.describe('GSD', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/gsd');
+    await page.waitForSelector('[data-testid="gsd-shell"]');
+  });
+
+  test('full page', async ({ page }) => {
+    await expect(page).toHaveScreenshot('gsd-full.png', ssOpts);
+  });
+
+  test('topbar', async ({ page }) => {
+    const topbar = page.locator('[data-testid="gsd-topbar"]');
+    await expect(topbar).toHaveScreenshot('gsd-topbar.png', ssOpts);
+  });
+
+  test('agent sidebar', async ({ page }) => {
+    const sidebar = page.locator('[data-testid="gsd-sidebar"]');
+    await expect(sidebar).toHaveScreenshot('gsd-sidebar.png', ssOpts);
+  });
+
+  test('priority queue', async ({ page }) => {
+    const queue = page.locator('[data-testid="gsd-queue"]');
+    await expect(queue).toHaveScreenshot('gsd-queue.png', ssOpts);
+  });
+
+  test('detail panel', async ({ page }) => {
+    const detail = page.locator('[data-testid="gsd-detail"]');
+    await expect(detail).toHaveScreenshot('gsd-detail.png', ssOpts);
+  });
+
+  test('command bar', async ({ page }) => {
+    const bar = page.locator('[data-testid="gsd-command-bar"]');
+    await expect(bar).toHaveScreenshot('gsd-command-bar.png', ssOpts);
+  });
+
+  test('select in-progress issue', async ({ page }) => {
+    await page.click('[data-testid="gsd-queue-issue-1"]');
+    await expect(page).toHaveScreenshot('gsd-issue-inprogress.png', ssOpts);
+  });
+
+  test('select done issue', async ({ page }) => {
+    await page.click('[data-testid="gsd-queue-issue-6"]');
+    await expect(page).toHaveScreenshot('gsd-issue-done.png', ssOpts);
+  });
+
+  test('plan section', async ({ page }) => {
+    await page.click('[data-testid="gsd-queue-issue-1"]');
+    const plan = page.locator('[data-testid="gsd-plan"]');
+    await expect(plan).toHaveScreenshot('gsd-plan.png', ssOpts);
+  });
+
+  test('tasks section', async ({ page }) => {
+    await page.click('[data-testid="gsd-queue-issue-1"]');
+    const tasks = page.locator('[data-testid="gsd-tasks"]');
+    await expect(tasks).toHaveScreenshot('gsd-tasks.png', ssOpts);
+  });
+});
