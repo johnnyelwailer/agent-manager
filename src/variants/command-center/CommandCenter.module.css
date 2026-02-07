@@ -1,0 +1,566 @@
+/* Command Center — Dark mission-control dashboard */
+
+.root {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 16px;
+  background: #010409;
+  border-bottom: 1px solid #30363d;
+  user-select: none;
+}
+
+.topBarTitle {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #58a6ff;
+  text-transform: uppercase;
+}
+
+.topBarClock {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+/* ── Grid ────────────────────────────────────────────────────────────── */
+
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr 280px;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: #30363d;
+  min-height: 0;
+}
+
+/* ── Panel base ──────────────────────────────────────────────────────── */
+
+.panel {
+  background: #161b22;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #30363d;
+  min-height: 34px;
+  user-select: none;
+}
+
+.panelHeaderTitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.panelHeaderBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #30363d;
+  color: #8b949e;
+}
+
+.panelBody {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* thin dark scrollbars */
+.panelBody::-webkit-scrollbar {
+  width: 6px;
+}
+.panelBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+.panelBody::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+/* ── Agents panel (left-top) ─────────────────────────────────────────── */
+
+.agentPanel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.agentCard {
+  padding: 10px 12px;
+  border-bottom: 1px solid #21262d;
+  transition: background 0.15s;
+}
+
+.agentCard:hover {
+  background: #1c2128;
+}
+
+.agentCardTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.agentStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agentName {
+  font-weight: 600;
+  font-size: 13px;
+  color: #e6edf3;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agentModel {
+  font-size: 11px;
+  color: #8b949e;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.agentStatusBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.agentTask {
+  font-size: 12px;
+  color: #8b949e;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agentMeta {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.agentMetaItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agentMetaLabel {
+  color: #484f58;
+}
+
+.agentMetaValue {
+  color: #8b949e;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* ── Strategy tree (left-bottom) ─────────────────────────────────────── */
+
+.strategyPanel {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.strategyTree {
+  padding: 4px 0;
+}
+
+.strategyNode {
+  list-style: none;
+}
+
+.strategyDetails {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.strategyDetails > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #e6edf3;
+  list-style: none;
+  transition: background 0.15s;
+}
+
+.strategyDetails > summary:hover {
+  background: #1c2128;
+}
+
+.strategyDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.strategyDetails > summary::before {
+  content: '\25B6';
+  font-size: 8px;
+  color: #484f58;
+  transition: transform 0.15s;
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.strategyDetails[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.strategyLeaf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #e6edf3;
+  transition: background 0.15s;
+}
+
+.strategyLeaf:hover {
+  background: #1c2128;
+}
+
+.strategyLeafBullet {
+  width: 12px;
+  text-align: center;
+  color: #484f58;
+  font-size: 8px;
+  flex-shrink: 0;
+}
+
+.strategyChildren {
+  padding-left: 16px;
+}
+
+.strategyTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strategyTitleActive {
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.strategyStatusBadge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+/* ── Execution log (center, full height) ─────────────────────────────── */
+
+.executionPanel {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+.executionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #30363d;
+  min-height: 34px;
+  flex-wrap: wrap;
+}
+
+.executionTitle {
+  font-weight: 600;
+  font-size: 13px;
+  color: #e6edf3;
+}
+
+.executionAgent {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.executionStatusBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.executionElapsed {
+  font-size: 11px;
+  color: #8b949e;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  margin-left: auto;
+}
+
+.executionLog {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.executionLog::-webkit-scrollbar {
+  width: 6px;
+}
+.executionLog::-webkit-scrollbar-track {
+  background: transparent;
+}
+.executionLog::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+.logEntry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 16px;
+  transition: background 0.1s;
+}
+
+.logEntry:hover {
+  background: #1c2128;
+}
+
+.logTimestamp {
+  color: #484f58;
+  font-size: 11px;
+  min-width: 52px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-top: 1px;
+}
+
+.logTypeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 60px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.logToolName {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #1f2937;
+  color: #79c0ff;
+  border: 1px solid #30363d;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.logContent {
+  color: #c9d1d9;
+  flex: 1;
+  word-break: break-word;
+}
+
+.logContentError {
+  color: #f85149;
+}
+
+.logContentThinking {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.logCursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: #58a6ff;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Verification panel (right-top) ──────────────────────────────────── */
+
+.verificationPanel {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.verRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #21262d;
+  transition: background 0.15s;
+}
+
+.verRow:hover {
+  background: #1c2128;
+}
+
+.verTypeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: center;
+}
+
+.verInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.verExecId {
+  font-size: 11px;
+  color: #58a6ff;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.verDetails {
+  font-size: 11px;
+  color: #8b949e;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.verStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* ── Context panel (right-bottom) ────────────────────────────────────── */
+
+.contextPanel {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.ctxCard {
+  padding: 10px 12px;
+  border-bottom: 1px solid #21262d;
+  transition: background 0.15s;
+}
+
+.ctxCard:hover {
+  background: #1c2128;
+}
+
+.ctxTitle {
+  font-weight: 600;
+  font-size: 12px;
+  color: #e6edf3;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ctxSource {
+  font-size: 11px;
+  color: #484f58;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  margin-bottom: 6px;
+}
+
+.ctxTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.ctxTag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #1f2937;
+  color: #58a6ff;
+  border: 1px solid #30363d;
+}
+
+.ctxContent {
+  font-size: 11px;
+  color: #8b949e;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
