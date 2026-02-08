@@ -79,7 +79,7 @@ class MockAdapter implements Adapter {
 
 let manager: SessionManager;
 let wsHandler: WsHandler;
-let server: ReturnType<typeof Bun.serve>;
+let server: ReturnType<typeof Bun.serve<WsClientState>>;
 let port: number;
 const openSockets: WebSocket[] = [];
 
@@ -89,13 +89,15 @@ beforeAll(() => {
   wsHandler = new WsHandler(manager.bus);
   const app = createApp(manager);
 
-  server = Bun.serve({
+  server = Bun.serve<WsClientState>({
     port: 0,
     hostname: '127.0.0.1',
     fetch(req, server) {
       const url = new URL(req.url);
       if (url.pathname === '/ws') {
-        const upgraded = server.upgrade(req, { data: {} });
+        const upgraded = server.upgrade(req, {
+          data: { subscribedAll: false, unsubAll: undefined, sessions: new Map() },
+        });
         if (upgraded) return undefined;
         return new Response('WebSocket upgrade failed', { status: 400 });
       }
@@ -107,7 +109,7 @@ beforeAll(() => {
       close(ws) { wsHandler.onClose(ws); },
     },
   });
-  port = server.port;
+  port = server.port ?? 0;
 });
 
 afterEach(async () => {
@@ -260,6 +262,58 @@ describe('WebSocket transport', () => {
     ws.send(JSON.stringify({ type: 'unsubscribe', scope: 'all' }));
     const next = await waitForMessage(ws) as { type: string };
     expect(next.type).toBe('unsubscribed');
+  });
+
+  it('delivers events to session-scoped subscribers', async () => {
+    const ws = await connectWs();
+
+    // Start a session first, then subscribe
+    const info = await manager.startSession('mock', { prompt: 'delivery test', cwd: '/tmp' });
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'session', sessionId: info.sessionId }));
+    const subAck = await waitForMessage(ws) as { type: string };
+    expect(subAck.type).toBe('subscribed');
+
+    // The session_end fires after 10ms, so we should receive it
+    const messages: unknown[] = [];
+    ws.onmessage = (event) => {
+      messages.push(JSON.parse(String(event.data)));
+    };
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Should have received the session_end event
+    const types = messages.map((m: any) => m.type);
+    expect(types).toContain('session_end');
+
+    // All received events should be for our session
+    for (const msg of messages) {
+      const m = msg as { sessionId?: string };
+      if (m.sessionId) {
+        expect(m.sessionId).toBe(info.sessionId);
+      }
+    }
+  });
+
+  it('does not deliver events for other sessions to scoped subscriber', async () => {
+    const ws = await connectWs();
+
+    // Subscribe to a specific session ID
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'session', sessionId: 'nonexistent-session' }));
+    const subAck = await waitForMessage(ws) as { type: string };
+    expect(subAck.type).toBe('subscribed');
+
+    const messages: unknown[] = [];
+    ws.onmessage = (event) => {
+      messages.push(JSON.parse(String(event.data)));
+    };
+
+    // Start a different session
+    await manager.startSession('mock', { prompt: 'other session', cwd: '/tmp' });
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Should NOT have received any events (subscribed to different session)
+    const agentEvents = messages.filter((m: any) => m.sessionId);
+    expect(agentEvents).toHaveLength(0);
   });
 
   it('tracks client count', async () => {

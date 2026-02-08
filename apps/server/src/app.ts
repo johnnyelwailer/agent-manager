@@ -5,12 +5,12 @@ import { createAdapterRoutes } from './routes/adapters.js';
 import type { SessionManager } from './core/session-manager.js';
 
 export function createApp(manager: SessionManager) {
-  const app = new Hono();
-
-  app.use('*', cors());
-
-  app.route('/api/sessions', createSessionRoutes(manager));
-  app.route('/api/adapters', createAdapterRoutes(manager));
+  const app = new Hono()
+    .use('*', cors())
+    .route('/api/sessions', createSessionRoutes(manager))
+    .route('/api/adapters', createAdapterRoutes(manager));
 
   return app;
 }
+
+export type AppType = ReturnType<typeof createApp>;

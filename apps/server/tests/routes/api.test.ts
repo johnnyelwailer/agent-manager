@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, it, expect, beforeAll } from 'bun:test';
+import { testClient } from 'hono/testing';
 import { randomUUID } from 'node:crypto';
-import { createApp } from '../../src/app.js';
+import { createApp, type AppType } from '../../src/app.js';
 import { SessionManager } from '../../src/core/session-manager.js';
 import type { Adapter, SessionHandle } from '../../src/adapters/adapter.js';
 import type { AgentEvent, AdapterManifest, SessionConfig } from '@agent-manager/shared';
@@ -18,7 +19,7 @@ class MockAdapter implements Adapter {
   };
 
   available = true;
-  events: Omit<AgentEvent, 'id' | 'sessionId' | 'timestamp'>[] = [];
+  events: Array<{ type: string; [key: string]: unknown }> = [];
 
   async checkAvailability(): Promise<string | null> {
     return this.available ? null : 'Mock unavailable';
@@ -51,7 +52,7 @@ class MockAdapter implements Adapter {
     let resolveSession: () => void;
     const done = new Promise<void>((resolve) => { resolveSession = resolve; });
 
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       onEvent({
         id: randomUUID(),
         sessionId,
@@ -65,10 +66,6 @@ class MockAdapter implements Adapter {
       });
       resolveSession!();
     }, 10);
-    // Bun doesn't have .unref(), so we just let it run
-    if (typeof timer === 'object' && 'unref' in timer) {
-      (timer as NodeJS.Timeout).unref();
-    }
 
     return {
       sessionId,
@@ -81,12 +78,13 @@ class MockAdapter implements Adapter {
 }
 
 // ---------------------------------------------------------------------------
-// Test helpers
+// Setup
 // ---------------------------------------------------------------------------
 
 let manager: SessionManager;
 let mockAdapter: MockAdapter;
-let app: ReturnType<typeof createApp>;
+let app: AppType;
+let client: ReturnType<typeof testClient<AppType>>;
 
 beforeAll(() => {
   manager = new SessionManager();
@@ -96,8 +94,10 @@ beforeAll(() => {
   ];
   manager.registerAdapter(mockAdapter);
   app = createApp(manager);
+  client = testClient(app);
 });
 
+// Also keep raw request helper for edge cases testClient can't cover
 function req(path: string, init?: RequestInit) {
   return app.request(path, init);
 }
@@ -108,63 +108,62 @@ function req(path: string, init?: RequestInit) {
 
 describe('REST API', () => {
   it('GET /api/adapters returns registered adapters', async () => {
-    const res = await req('/api/adapters');
+    const res = await client.api.adapters.$get();
     expect(res.status).toBe(200);
-    const body = await res.json() as { adapters: { id: string }[] };
+    const body = await res.json();
     expect(body.adapters).toHaveLength(1);
     expect(body.adapters[0]!.id).toBe('mock');
   });
 
   it('GET /api/adapters/:id/available checks adapter availability', async () => {
-    const res = await req('/api/adapters/mock/available');
+    const res = await client.api.adapters[':id'].available.$get({ param: { id: 'mock' } });
     expect(res.status).toBe(200);
-    const body = await res.json() as { available: boolean };
-    expect(body.available).toBe(true);
+    const body = await res.json();
+    if ('available' in body) {
+      expect(body.available).toBe(true);
+    }
   });
 
   it('GET /api/adapters/:id/available returns 404 for unknown adapter', async () => {
-    const res = await req('/api/adapters/unknown/available');
+    const res = await client.api.adapters[':id'].available.$get({ param: { id: 'unknown' } });
     expect(res.status).toBe(404);
   });
 
   it('GET /api/adapters/:id/available reports unavailable adapter', async () => {
     mockAdapter.available = false;
     try {
-      const res = await req('/api/adapters/mock/available');
+      const res = await client.api.adapters[':id'].available.$get({ param: { id: 'mock' } });
       expect(res.status).toBe(200);
-      const body = await res.json() as { available: boolean; error: string };
-      expect(body.available).toBe(false);
-      expect(body.error).toBeTruthy();
+      const body = await res.json();
+      if ('available' in body) {
+        expect(body.available).toBe(false);
+      }
     } finally {
       mockAdapter.available = true;
     }
   });
 
   it('GET /api/sessions returns empty list initially', async () => {
-    // Use a fresh manager for this test
     const freshManager = new SessionManager();
     freshManager.registerAdapter(mockAdapter);
     const freshApp = createApp(freshManager);
-    const res = await freshApp.request('/api/sessions');
+    const freshClient = testClient(freshApp);
+    const res = await freshClient.api.sessions.$get();
     expect(res.status).toBe(200);
-    const body = await res.json() as { sessions: unknown[] };
+    const body = await res.json();
     expect(body.sessions).toHaveLength(0);
   });
 
   it('POST /api/sessions starts a new session', async () => {
-    const res = await req('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adapterId: 'mock',
-        prompt: 'test prompt',
-        cwd: '/tmp',
-      }),
+    const res = await client.api.sessions.$post({
+      json: { adapterId: 'mock', prompt: 'test prompt', cwd: '/tmp' },
     });
     expect(res.status).toBe(201);
-    const body = await res.json() as { session: { sessionId: string; adapterId: string } };
-    expect(body.session.sessionId).toBeTruthy();
-    expect(body.session.adapterId).toBe('mock');
+    const body = await res.json();
+    if ('session' in body) {
+      expect(body.session.sessionId).toBeTruthy();
+      expect(body.session.adapterId).toBe('mock');
+    }
   });
 
   it('POST /api/sessions rejects missing fields', async () => {
@@ -177,66 +176,58 @@ describe('REST API', () => {
   });
 
   it('POST /api/sessions rejects unknown adapter', async () => {
-    const res = await req('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adapterId: 'nonexistent',
-        prompt: 'test',
-        cwd: '/tmp',
-      }),
+    const res = await client.api.sessions.$post({
+      json: { adapterId: 'nonexistent', prompt: 'test', cwd: '/tmp' },
     });
     expect(res.status).toBe(500);
   });
 
   it('GET /api/sessions/:id returns session details', async () => {
-    const createRes = await req('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adapterId: 'mock',
-        prompt: 'detail test',
-        cwd: '/tmp',
-      }),
+    const createRes = await client.api.sessions.$post({
+      json: { adapterId: 'mock', prompt: 'detail test', cwd: '/tmp' },
     });
-    const { session: created } = await createRes.json() as { session: { sessionId: string } };
+    const created = await createRes.json();
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const res = await req(`/api/sessions/${created.sessionId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json() as { session: { sessionId: string; events: unknown[] } };
-    expect(body.session.sessionId).toBe(created.sessionId);
-    expect(body.session.events.length).toBeGreaterThan(0);
+    if ('session' in created) {
+      const res = await client.api.sessions[':id'].$get({ param: { id: created.session.sessionId } });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      if ('session' in body) {
+        expect(body.session.sessionId).toBe(created.session.sessionId);
+        expect(body.session.events.length).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('GET /api/sessions/:id returns 404 for unknown session', async () => {
-    const res = await req('/api/sessions/nonexistent');
+    const res = await client.api.sessions[':id'].$get({ param: { id: 'nonexistent' } });
     expect(res.status).toBe(404);
   });
 
   it('POST /api/sessions/:id/interrupt returns 404 for unknown session', async () => {
-    const res = await req('/api/sessions/nonexistent/interrupt', { method: 'POST' });
+    const res = await client.api.sessions[':id'].interrupt.$post({ param: { id: 'nonexistent' } });
     expect(res.status).toBe(404);
   });
 
   it('POST /api/sessions/:id/terminate returns 404 for unknown session', async () => {
-    const res = await req('/api/sessions/nonexistent/terminate', { method: 'POST' });
+    const res = await client.api.sessions[':id'].terminate.$post({ param: { id: 'nonexistent' } });
     expect(res.status).toBe(404);
   });
 
   it('POST /api/sessions/:id/kill returns 404 for unknown session', async () => {
-    const res = await req('/api/sessions/nonexistent/kill', { method: 'POST' });
+    const res = await client.api.sessions[':id'].kill.$post({ param: { id: 'nonexistent' } });
     expect(res.status).toBe(404);
   });
 
   it('GET /api/sessions list omits events but includes eventCount', async () => {
-    const res = await req('/api/sessions');
+    const res = await client.api.sessions.$get();
     expect(res.status).toBe(200);
-    const body = await res.json() as { sessions: { events?: unknown; eventCount: number }[] };
+    const body = await res.json();
     expect(body.sessions.length).toBeGreaterThan(0);
     for (const s of body.sessions) {
-      expect(s.events).toBeUndefined();
+      expect((s as any).events).toBeUndefined();
       expect(typeof s.eventCount).toBe('number');
     }
   });

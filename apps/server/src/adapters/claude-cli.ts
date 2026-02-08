@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { ProcessManager } from '../core/process-manager.js';
 import type { Adapter, SessionHandle } from './adapter.js';
-import type {
-  AgentEvent,
-  AdapterManifest,
-  SessionConfig,
-  ClaudeStreamMessage,
-  ClaudeAssistantMessage,
-  ClaudeUserMessage,
-  ClaudeContentBlock,
+import {
+  claudeStreamMessageSchema,
+  type AgentEvent,
+  type AdapterManifest,
+  type SessionConfig,
+  type ClaudeStreamMessage,
+  type ClaudeAssistantMessage,
+  type ClaudeUserMessage,
+  type ClaudeContentBlock,
 } from '@agent-manager/shared';
 
 export class ClaudeCliAdapter implements Adapter {
@@ -55,22 +56,33 @@ export class ClaudeCliAdapter implements Adapter {
     });
 
     const startTime = Date.now();
-    let model = 'unknown';
-    let cwd = config.cwd;
+    let sessionStartEmitted = false;
 
     const managed = this.processManager.spawn({
       command: this.claudeBinary,
       args,
       cwd: config.cwd,
       onMessage: (raw) => {
-        const msg = raw as ClaudeStreamMessage;
-        const events = this.normalize(sessionId, msg, startTime);
+        const parsed = claudeStreamMessageSchema.safeParse(raw);
+        if (!parsed.success) {
+          return;
+        }
+        const msg = parsed.data;
 
+        // Emit session_start when we receive system.init (with real model/cwd)
         if (msg.type === 'system' && msg.subtype === 'init') {
-          model = msg.model;
-          if (msg.cwd) cwd = msg.cwd;
+          sessionStartEmitted = true;
+          onEvent({
+            id: randomUUID(),
+            sessionId,
+            timestamp: new Date().toISOString(),
+            type: 'session_start',
+            model: msg.model,
+            cwd: msg.cwd ?? config.cwd,
+          });
         }
 
+        const events = this.normalize(sessionId, msg, startTime);
         for (const event of events) {
           onEvent(event);
         }
@@ -88,6 +100,19 @@ export class ClaudeCliAdapter implements Adapter {
         }
       },
       onExit: (code, signal) => {
+        // If process dies before system.init, emit session_start with fallback values
+        if (!sessionStartEmitted) {
+          sessionStartEmitted = true;
+          onEvent({
+            id: randomUUID(),
+            sessionId,
+            timestamp: new Date().toISOString(),
+            type: 'session_start',
+            model: 'unknown',
+            cwd: config.cwd,
+          });
+        }
+
         if (signal === 'SIGINT' || signal === 'SIGTERM') {
           onEvent({
             id: randomUUID(),
@@ -118,15 +143,6 @@ export class ClaudeCliAdapter implements Adapter {
           resolveSession!();
         }
       },
-    });
-
-    onEvent({
-      id: randomUUID(),
-      sessionId,
-      timestamp: new Date().toISOString(),
-      type: 'session_start',
-      model,
-      cwd,
     });
 
     return {

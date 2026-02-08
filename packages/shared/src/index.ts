@@ -50,6 +50,7 @@ export {
 } from './schemas/claude-cli.js';
 
 export {
+  wsCommandSchema,
   wsSubscribeAllSchema,
   wsSubscribeSessionSchema,
   wsUnsubscribeAllSchema,
@@ -107,6 +108,7 @@ export type {
 } from './schemas/claude-cli.js';
 
 export type {
+  WsCommand,
   WsSubscribeAll,
   WsSubscribeSession,
   WsUnsubscribeAll,

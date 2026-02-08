@@ -1,16 +1,16 @@
-import type { AgentEvent } from '@agent-manager/shared';
+import { wsCommandSchema, type WsCommand } from '@agent-manager/shared';
 import type { EventBus } from '../core/event-bus.js';
 import type { ServerWebSocket } from 'bun';
 
 export interface WsClientState {
   subscribedAll: boolean;
-  unsubAll?: () => void;
+  unsubAll: (() => void) | undefined;
   sessions: Map<string, () => void>;
 }
 
 export class WsHandler {
   private bus: EventBus;
-  private clients = new Map<ServerWebSocket<WsClientState>, WsClientState>();
+  private clients = new Set<ServerWebSocket<WsClientState>>();
 
   constructor(bus: EventBus) {
     this.bus = bus;
@@ -23,25 +23,43 @@ export class WsHandler {
   onOpen(ws: ServerWebSocket<WsClientState>): void {
     const state: WsClientState = {
       subscribedAll: false,
+      unsubAll: undefined,
       sessions: new Map(),
     };
     ws.data = state;
-    this.clients.set(ws, state);
+    this.clients.add(ws);
   }
 
   onMessage(ws: ServerWebSocket<WsClientState>, message: string | Buffer): void {
     const state = ws.data;
     if (!state) return;
 
-    let cmd: Record<string, unknown>;
+    let raw: unknown;
     try {
-      cmd = JSON.parse(String(message)) as Record<string, unknown>;
+      raw = JSON.parse(String(message));
     } catch {
       ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' }));
       return;
     }
 
-    this.handleCommand(ws, state, cmd);
+    const parsed = wsCommandSchema.safeParse(raw);
+    if (!parsed.success) {
+      const obj = raw as Record<string, unknown> | null;
+      const type = obj && typeof obj === 'object' ? obj.type : undefined;
+      if (type !== 'subscribe' && type !== 'unsubscribe') {
+        ws.send(JSON.stringify({ type: 'error', message: `Unknown command type: "${type}"` }));
+      } else {
+        const scope = obj && typeof obj === 'object' ? obj.scope : undefined;
+        if (scope !== 'all' && scope !== 'session') {
+          ws.send(JSON.stringify({ type: 'error', message: `Invalid scope: "${scope}". Use "all" or "session"` }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'sessionId is required when scope is "session"' }));
+        }
+      }
+      return;
+    }
+
+    this.handleCommand(ws, state, parsed.data);
   }
 
   onClose(ws: ServerWebSocket<WsClientState>): void {
@@ -53,8 +71,8 @@ export class WsHandler {
   }
 
   close(): void {
-    for (const [ws, state] of this.clients) {
-      this.cleanupClient(state);
+    for (const ws of this.clients) {
+      this.cleanupClient(ws.data);
       ws.close();
     }
     this.clients.clear();
@@ -63,55 +81,40 @@ export class WsHandler {
   private handleCommand(
     ws: ServerWebSocket<WsClientState>,
     state: WsClientState,
-    cmd: Record<string, unknown>,
+    cmd: WsCommand,
   ): void {
-    const type = cmd.type as string | undefined;
-    const scope = cmd.scope as string | undefined;
-    const sessionId = cmd.sessionId as string | undefined;
+    switch (cmd.type) {
+      case 'subscribe':
+        if (cmd.scope === 'all') {
+          if (state.subscribedAll) return;
+          state.subscribedAll = true;
+          state.unsubAll = this.bus.onAll((event) => {
+            ws.send(JSON.stringify(event));
+          });
+          ws.send(JSON.stringify({ type: 'subscribed', scope: 'all' }));
+        } else {
+          if (state.sessions.has(cmd.sessionId)) return;
+          const unsub = this.bus.on(cmd.sessionId, (event) => {
+            ws.send(JSON.stringify(event));
+          });
+          state.sessions.set(cmd.sessionId, unsub);
+          ws.send(JSON.stringify({ type: 'subscribed', scope: 'session', sessionId: cmd.sessionId }));
+        }
+        break;
 
-    if (type !== 'subscribe' && type !== 'unsubscribe') {
-      ws.send(JSON.stringify({ type: 'error', message: `Unknown command type: "${type}"` }));
-      return;
-    }
-
-    if (scope !== 'all' && scope !== 'session') {
-      ws.send(JSON.stringify({ type: 'error', message: `Invalid scope: "${scope}". Use "all" or "session"` }));
-      return;
-    }
-
-    if (scope === 'session' && !sessionId) {
-      ws.send(JSON.stringify({ type: 'error', message: 'sessionId is required when scope is "session"' }));
-      return;
-    }
-
-    if (type === 'subscribe') {
-      if (scope === 'all') {
-        if (state.subscribedAll) return;
-        state.subscribedAll = true;
-        state.unsubAll = this.bus.onAll((event) => {
-          ws.send(JSON.stringify(event));
-        });
-        ws.send(JSON.stringify({ type: 'subscribed', scope: 'all' }));
-      } else {
-        if (state.sessions.has(sessionId!)) return;
-        const unsub = this.bus.on(sessionId!, (event) => {
-          ws.send(JSON.stringify(event));
-        });
-        state.sessions.set(sessionId!, unsub);
-        ws.send(JSON.stringify({ type: 'subscribed', scope: 'session', sessionId }));
-      }
-    } else {
-      if (scope === 'all') {
-        state.unsubAll?.();
-        state.unsubAll = undefined;
-        state.subscribedAll = false;
-        ws.send(JSON.stringify({ type: 'unsubscribed', scope: 'all' }));
-      } else {
-        const unsub = state.sessions.get(sessionId!);
-        unsub?.();
-        state.sessions.delete(sessionId!);
-        ws.send(JSON.stringify({ type: 'unsubscribed', scope: 'session', sessionId }));
-      }
+      case 'unsubscribe':
+        if (cmd.scope === 'all') {
+          state.unsubAll?.();
+          state.unsubAll = undefined;
+          state.subscribedAll = false;
+          ws.send(JSON.stringify({ type: 'unsubscribed', scope: 'all' }));
+        } else {
+          const unsub = state.sessions.get(cmd.sessionId);
+          unsub?.();
+          state.sessions.delete(cmd.sessionId);
+          ws.send(JSON.stringify({ type: 'unsubscribed', scope: 'session', sessionId: cmd.sessionId }));
+        }
+        break;
     }
   }
 

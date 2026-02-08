@@ -78,7 +78,6 @@ export class SessionManager {
     });
 
     this.handles.set(sessionId, handle);
-    info.status = 'running';
 
     handle.done
       .catch(() => {})

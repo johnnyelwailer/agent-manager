@@ -26,12 +26,14 @@ export const wsUnsubscribeSessionSchema = z.object({
   sessionId: z.string(),
 });
 
-export const wsCommandSchema = z.discriminatedUnion('type', [
-  wsSubscribeAllSchema.extend({ type: z.literal('subscribe') }),
-  wsUnsubscribeAllSchema.extend({ type: z.literal('unsubscribe') }),
+export const wsCommandSchema = z.union([
+  wsSubscribeAllSchema,
+  wsSubscribeSessionSchema,
+  wsUnsubscribeAllSchema,
+  wsUnsubscribeSessionSchema,
 ]);
 
-// For commands that need scope discrimination, parse manually
+export type WsCommand = z.infer<typeof wsCommandSchema>;
 export type WsSubscribeAll = z.infer<typeof wsSubscribeAllSchema>;
 export type WsSubscribeSession = z.infer<typeof wsSubscribeSessionSchema>;
 export type WsUnsubscribeAll = z.infer<typeof wsUnsubscribeAllSchema>;

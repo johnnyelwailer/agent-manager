@@ -12,17 +12,19 @@ manager.registerAdapter(new ClaudeCliAdapter());
 const app = createApp(manager);
 const wsHandler = new WsHandler(manager.bus);
 
-const server = Bun.serve({
+const server = Bun.serve<WsClientState>({
   port,
   hostname: host,
   fetch(req, server) {
     const url = new URL(req.url);
     if (url.pathname === '/ws') {
-      const upgraded = server.upgrade(req, { data: {} });
+      const upgraded = server.upgrade(req, {
+        data: { subscribedAll: false, unsubAll: undefined, sessions: new Map() } satisfies WsClientState,
+      });
       if (upgraded) return undefined;
       return new Response('WebSocket upgrade failed', { status: 400 });
     }
-    return app.fetch(req, { ip: server.requestIP(req) });
+    return app.fetch(req);
   },
   websocket: {
     open(ws) {
