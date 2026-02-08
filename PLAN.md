@@ -1,7 +1,7 @@
 # Agent Manager — Implementation Plan
 
 > **Last Updated:** 2026-02-08
-> **Status:** Layers 1+2+3 complete. Layer 4 next.
+> **Status:** Engine prototype complete (Layers 1-3). Rebuilding as real app.
 
 ## Vision
 
@@ -18,14 +18,14 @@ A local desktop app that orchestrates AI agent sessions across multiple runtimes
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                     UI (React)                           │
+│              UI (React 19 + shadcn + TW4)                │
 │  Ops view (issue detail) │ Kanban (board overview)       │
 │  Brief (session start)   │ Agent console (streaming)     │
 └─────────────────────┬────────────────────────────────────┘
                       │ WebSocket / IPC
 ┌─────────────────────▼────────────────────────────────────┐
-│                 Session Manager                          │
-│  Tracks sessions, routes events through EventBus         │
+│            Backend (Bun + Hono)                          │
+│  Sessions, adapters, events, persistence                 │
 └─────────────────────┬────────────────────────────────────┘
                       │
         ┌─────────────┼─────────────┐
@@ -36,130 +36,263 @@ A local desktop app that orchestrates AI agent sessions across multiple runtimes
  └──────┬──────┘ └────┬────┘ └─────┬─────┘
         │              │            │
    claude -p ...   gsd run ...   mm exec ...
-   --output-format
-    stream-json
 ```
 
-Each adapter implements the same interface:
-1. `checkAvailability()` — verify the CLI binary exists
-2. `startSession(config, onEvent)` — spawn process, normalize stdout, emit `AgentEvent`s
+## Tech Stack
 
-## Layers & Progress
+Priorities: **typesafety** and **testability** above all else.
 
-### Layer 1: Core Engine — DONE
+### Runtime & Backend
 
-| Component | File | Status | Description |
-|-----------|------|--------|-------------|
-| Event types | `src/types/events.ts` | Done | 10 normalized `AgentEvent` types |
-| CLI types | `src/types/claude-cli.ts` | Done | Raw `stream-json` NDJSON types |
-| Process Manager | `src/core/process-manager.ts` | Done | Spawn/track/kill child processes, parse NDJSON |
-| Event Bus | `src/core/event-bus.ts` | Done | Typed pub/sub (global + per-session) |
-| Session Manager | `src/core/session-manager.ts` | Done | Multi-session orchestrator, cost tracking |
+| Choice | Why |
+|--------|-----|
+| **Bun 1.3** | Built-in HTTP/WS server, fast test runner, TS-native, child_process compat |
+| **Hono** | Lightweight, end-to-end type-safe routes, works on Bun natively, RPC client for frontend |
+| **Bun.serve()** | Unified HTTP + WebSocket in one server — no `ws` package needed |
+| **SQLite via Bun** | Local-first persistence for sessions, issues, tasks. Tauri-friendly (single file) |
 
-### Layer 2: Adapter System — DONE (Claude adapter)
+**Why Hono over raw Bun.serve():** Hono's `hono/client` gives us a typed RPC layer — the frontend gets autocomplete and type errors for every API call without codegen. Combined with Zod validators, every request/response is validated at the boundary and typed end-to-end.
 
-| Component | File | Status | Description |
-|-----------|------|--------|-------------|
-| Adapter interface | `src/adapters/adapter.ts` | Done | Universal contract for any CLI agent |
-| Claude CLI adapter | `src/adapters/claude-cli.ts` | Done | Wraps `claude -p --output-format stream-json` |
-| Tests | `src/adapters/claude-cli.test.ts` | Done | 10 tests passing (fake claude shell scripts) |
+### Frontend
 
-### Layer 3: Transport + API Server — DONE
+| Choice | Why |
+|--------|-----|
+| **React 19** | Stable, ref-as-prop, Actions, `use()` hook |
+| **Vite 7** | Fast dev, first-party TW4 plugin, proxy for backend |
+| **Tailwind CSS 4** | CSS-first `@theme` config, Rust engine, built-in container queries |
+| **shadcn/ui** | Copy-paste components we own, built on Radix, TW4 + React 19 ready |
+| **TanStack Router** | File-based routing with full type safety (params, search, loaders all typed) |
+| **Zustand** | Minimal, no boilerplate, works with React 19, easy to test (plain functions) |
 
-Expose the engine over WebSocket so the React UI can connect.
+**Why TanStack Router over React Router:** Type-safe route params, search params, and loaders. Every `useParams()`, `useSearch()`, `Link to=` is validated at compile time.
 
-| Component | File | Status | Description |
-|-----------|------|--------|-------------|
-| WebSocket server | `src/server/ws.ts` | Done | Streams `AgentEvent`s to connected UI clients via subscribe/unsubscribe commands |
-| REST endpoints | `src/server/api.ts` | Done | Start/stop/list sessions, list adapters, check availability |
-| Server entry | `src/server/index.ts` | Done | `createServer()` factory combining WS + REST with CORS support |
-| Tests | `src/server/server.test.ts` | Done | 28 tests (17 REST + 11 WebSocket) |
+**Why Zustand over context:** Zustand stores are plain JS objects testable without React. No provider wrapping. Selectors prevent unnecessary re-renders. Works with React 19.
 
-### Layer 4: UI Integration — TODO
+### Monorepo & Tooling
 
-Wire the existing Ops and Kanban prototypes (in `prototype/`) to live data from the engine.
+| Choice | Why |
+|--------|-----|
+| **Bun workspaces** | Same runtime everywhere, zero extra tooling |
+| **TypeScript 5.9** | Current stable, strict mode |
+| **Bun test** | Built-in, fast, Jest-compatible API, runs TS natively |
+| **Playwright** | E2E tests for the UI |
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| Ops view | TODO | Replace mock data with WebSocket event stream |
-| Kanban view | TODO | Replace mock data with session list + status |
-| Brief startup | TODO | Session start page with adapter selection |
-| Shared types | TODO | Move `AgentEvent` types to a shared package usable by frontend |
+### Desktop (future)
 
-### Layer 5: Additional Adapters — TODO
+| Choice | Why |
+|--------|-----|
+| **Tauri 2.10** | Rust backend, OS webview, tiny binaries, SQLite-friendly |
 
-| Adapter | Status | Notes |
-|---------|--------|-------|
-| Claude CLI | Done | `claude -p --output-format stream-json` |
-| GSD | TODO | Need to research GSD CLI output format |
-| MetaMorph | TODO | Need to research MetaMorph CLI output format |
+Tauri considerations baked in now:
+- SQLite for persistence (ships as single file, Tauri can access natively)
+- All backend logic in pure TS/Bun (portable to Tauri's sidecar or Rust FFI later)
+- No server-only features in UI (everything works via IPC or localhost)
+- File paths handled via Tauri's path API abstraction when ready
 
-### Layer 6: External System Integration — TODO
+### Type Safety Strategy
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| Jira adapter | TODO | Pull issues, push status updates |
-| GitHub Enterprise adapter | TODO | PR creation, review status, CI checks |
-| Verification pipeline runner | TODO | Prechecks → AI Review → PR → Approval |
+End-to-end types, no `any`, no codegen:
 
-## Data Model
+```
+Zod schema (source of truth)
+  ↓ infer
+TypeScript types
+  ↓ shared package
+Backend (Hono validators)  ←→  Frontend (Hono RPC client)
+  ↓                               ↓
+Runtime validation              Compile-time autocomplete
+```
 
-Two type systems exist (see `prototype/src/types/`):
+- **Zod schemas** define all data shapes in `packages/shared/`
+- **Hono validators** use Zod at route boundaries — invalid requests rejected with typed errors
+- **Hono RPC client** (`hono/client`) — frontend calls `api.sessions.$get()` with full type inference
+- **Zustand stores** typed from the same Zod-inferred types
+- **WebSocket messages** validated with Zod discriminated unions on both sides
+- **Zero `any`** — `tsconfig` strict mode, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
 
-1. **Primitives** (`primitives.ts`) — abstract: Context, Strategy, Execution, Verification. Used by the 8 main UI variants.
-2. **Workflow** (`workflow.ts`) — concrete: Project → Issue → Plan → Task → VerificationPipeline. Used by Ops and Kanban. **This is the primary model going forward.**
+### Testing Strategy
 
-The workflow model maps to real dev workflows:
-- **Issue** = external work item (Jira ticket, GH issue). The *what*.
-- **Task** = local agent work unit. The *how*. One issue → many tasks.
-- **VerificationPipeline** = 4-stage gate per task: Prechecks (auto) → AI Review (auto) → PR (auto) → Approval (manual).
+Every layer testable in isolation:
 
-## Key UI Variants (from 14 explored)
+| Layer | Tool | What |
+|-------|------|------|
+| **Shared schemas** | `bun test` | Zod parse/reject for all types |
+| **Backend routes** | `bun test` + Hono `testClient` | Type-safe route testing without HTTP |
+| **Adapters** | `bun test` | Mock child processes, verify event normalization |
+| **Zustand stores** | `bun test` | Plain function tests, no React needed |
+| **React components** | `bun test` + Testing Library | Unit tests for component logic |
+| **E2E flows** | Playwright | Full UI → backend → agent flow |
 
-| Variant | Role | Why |
-|---------|------|-----|
-| **Ops** | Primary working view | Detail view: issue → plan → tasks → verification pipeline → agent activity |
-| **Kanban** | Overview/triage | Board across all issues: Backlog → Planning → In Progress → Blocked → Review → Done |
-| **Brief** | Session start | Mission briefing + chat sidebar. Entry point for new sessions |
+Hono's `testClient` is key — it lets us test routes as typed function calls:
+```ts
+const res = await testClient(app).api.sessions.$post({ json: { ... } });
+// res is fully typed, no HTTP overhead
+```
 
-The other 11 variants (AgentOS, Hive, Pipeline, Nerve Center, Mosaic, Command Center, Flow, Spatial, Chat, Dashboard, Command) are preserved in `prototype/` for reference.
-
-## File Structure
+## Project Structure
 
 ```
 agent-manager/
-├── RESEARCH_PLAN.md        # Deep research (SDK analysis, trade-offs, experiments)
-├── PLAN.md                 # This file — concrete implementation plan
-├── variant-showcase.pdf    # Visual reference for all 14 UI variants
-├── package.json            # Engine deps
-├── tsconfig.json
-├── src/                    # Orchestration engine
-│   ├── index.ts            # Public API
-│   ├── types/
-│   │   ├── events.ts       # Normalized AgentEvent schema (10 types)
-│   │   └── claude-cli.ts   # Raw stream-json NDJSON types
-│   ├── core/
-│   │   ├── process-manager.ts  # Child process spawn + NDJSON parsing
-│   │   ├── event-bus.ts        # Typed pub/sub
-│   │   └── session-manager.ts  # Multi-session orchestrator
-│   ├── adapters/
-│   │   ├── adapter.ts          # Universal adapter interface
-│   │   ├── claude-cli.ts       # Claude Code CLI adapter
-│   │   └── claude-cli.test.ts  # 10 tests
-│   └── server/
-│       ├── ws.ts               # WebSocket transport (subscribe/unsubscribe)
-│       ├── api.ts              # REST API handler (sessions, adapters)
-│       ├── index.ts            # createServer() factory
-│       └── server.test.ts      # 17 tests
-└── prototype/              # UI prototypes (14 variants, 92 screenshot tests)
-    ├── src/variants/...
-    ├── src/types/          # Primitives + Workflow type systems
-    └── ...
+├── PLAN.md                     # This file
+├── RESEARCH_PLAN.md            # Deep research notes
+├── variant-showcase.pdf        # Visual reference for UI variants
+├── bunfig.toml                 # Bun config
+├── package.json                # Workspace root
+├── packages/
+│   └── shared/                 # Shared types + schemas
+│       ├── package.json
+│       ├── src/
+│       │   ├── schemas/        # Zod schemas (source of truth)
+│       │   │   ├── events.ts   # AgentEvent schemas
+│       │   │   ├── sessions.ts # Session, adapter schemas
+│       │   │   └── workflow.ts # Issue, task, plan schemas
+│       │   ├── types/          # Inferred TS types (re-exported)
+│       │   └── index.ts        # Public API
+│       └── tests/
+├── apps/
+│   ├── server/                 # Bun + Hono backend
+│   │   ├── package.json
+│   │   ├── src/
+│   │   │   ├── app.ts          # Hono app (routes composed here)
+│   │   │   ├── main.ts         # Entry: Bun.serve() with app
+│   │   │   ├── routes/         # Hono route modules
+│   │   │   │   ├── sessions.ts
+│   │   │   │   ├── adapters.ts
+│   │   │   │   └── events.ts   # WebSocket upgrade route
+│   │   │   ├── core/           # Engine logic (ported from src/)
+│   │   │   │   ├── event-bus.ts
+│   │   │   │   ├── process-manager.ts
+│   │   │   │   └── session-manager.ts
+│   │   │   ├── adapters/       # CLI adapters
+│   │   │   │   ├── adapter.ts
+│   │   │   │   └── claude-cli.ts
+│   │   │   └── db/             # SQLite persistence
+│   │   │       ├── schema.ts   # Table definitions
+│   │   │       └── queries.ts  # Typed query functions
+│   │   └── tests/
+│   │       ├── routes/         # Route tests via testClient
+│   │       ├── adapters/       # Adapter unit tests
+│   │       └── core/           # Engine unit tests
+│   └── web/                    # React frontend
+│       ├── package.json
+│       ├── vite.config.ts
+│       ├── src/
+│       │   ├── main.tsx
+│       │   ├── routes/         # TanStack Router file-based routes
+│       │   │   ├── __root.tsx
+│       │   │   ├── index.tsx   # → redirect to /ops
+│       │   │   ├── ops.tsx
+│       │   │   ├── kanban.tsx
+│       │   │   └── brief.tsx
+│       │   ├── components/     # shadcn/ui + custom components
+│       │   │   ├── ui/         # shadcn primitives
+│       │   │   └── domain/     # App-specific (IssueCard, TaskCard, etc.)
+│       │   ├── stores/         # Zustand stores
+│       │   │   ├── sessions.ts
+│       │   │   ├── workflow.ts
+│       │   │   └── connection.ts
+│       │   ├── lib/            # API client, WS connection, utilities
+│       │   │   ├── api.ts      # Hono RPC client (typed)
+│       │   │   └── ws.ts       # WebSocket manager
+│       │   └── styles/
+│       │       └── app.css     # Tailwind imports + @theme
+│       └── tests/
+│           ├── components/     # Component unit tests
+│           ├── stores/         # Store unit tests
+│           └── e2e/            # Playwright E2E
+└── prototype/                  # Archived UI exploration (14 variants)
+    └── ...                     # Reference only — not the real app
 ```
 
-## Next Steps
+## What We Keep From the Engine Prototype
 
-1. **Layer 4: Wire Ops view** — replace mock data with real event stream; one issue, one task, one live agent
-2. **GSD/MetaMorph adapters** — research their CLI output formats and implement adapters
-3. **GitHub adapter** — `gh` CLI or GraphQL for PR creation (connects to the "PR" stage of verification pipeline)
-4. **Jira adapter** — REST API for issue sync
+The core abstractions in `src/` are solid and runtime-agnostic. Port them to `apps/server/`:
+
+| Component | Action | Notes |
+|-----------|--------|-------|
+| `EventBus` | Port as-is | Pure TS, no Node dependencies |
+| `ProcessManager` | Port, adapt for Bun | `child_process` → `Bun.spawn()` (or keep, Bun supports both) |
+| `SessionManager` | Port as-is | Pure TS orchestrator |
+| `Adapter` interface | Port as-is | Clean contract |
+| `ClaudeCliAdapter` | Port as-is | Well-tested NDJSON parser |
+| `AgentEvent` types | Rewrite as Zod schemas | Source of truth moves to `packages/shared/` |
+| REST API routes | Rewrite in Hono | Gain typed routes + validation |
+| WS transport | Rewrite for Bun.serve() WS | Native Bun WebSocket, no `ws` package |
+| 38 tests | Port to `bun test` | Same assertions, new runner |
+
+## Data Model
+
+One type system, defined as Zod schemas in `packages/shared/`:
+
+- **AgentEvent** — 10 event types emitted by adapters (session_start, text_delta, tool_call, etc.)
+- **Session** — runtime state of an agent execution (id, adapter, prompt, status, cost, events)
+- **Issue** — external work item (Jira ticket, GH issue). The *what*.
+- **Task** — local agent work unit. The *how*. One issue → many tasks. One task ↔ one session.
+- **Plan** — analysis output: steps, affected repos, complexity, risks
+- **VerificationPipeline** — 4-stage gate: Prechecks → AI Review → PR → Approval
+- **Agent** — adapter instance with current status and cost tracking
+- **Project/Repo** — container for repos with external links
+
+## Implementation Phases
+
+### Phase 1: Scaffold + Port Engine
+
+Set up the monorepo, port the working engine code, verify with tests.
+
+| Task | Description |
+|------|-------------|
+| Init Bun workspace | `package.json` workspaces, `bunfig.toml`, tsconfig |
+| Create `packages/shared` | Zod schemas for AgentEvent, Session, Workflow types |
+| Create `apps/server` | Hono app skeleton, port core engine (EventBus, ProcessManager, SessionManager) |
+| Port adapters | ClaudeCliAdapter → `apps/server/src/adapters/` |
+| Port + rewrite routes | Session/adapter CRUD as Hono typed routes with Zod validation |
+| Rewrite WS transport | Bun-native WebSocket in Hono |
+| Port tests | All 38 engine tests → `bun test` |
+| Add DB layer | SQLite schema for sessions, issues, tasks |
+
+### Phase 2: Frontend Shell
+
+Stand up the real React app with routing, components, and live data.
+
+| Task | Description |
+|------|-------------|
+| Init `apps/web` | Vite 7 + React 19 + TW4 + shadcn/ui |
+| TanStack Router | File-based routes: `/ops`, `/kanban`, `/brief` |
+| Hono RPC client | Typed API client generated from server routes |
+| WebSocket store | Zustand store for connection + real-time events |
+| Session store | Zustand store for sessions, tasks, workflow state |
+| Ops view | Port design from prototype, wire to live stores |
+| Kanban view | Port design from prototype, wire to live stores |
+| Brief/dispatch view | Session creation: pick adapter, enter prompt, configure, launch |
+
+### Phase 3: End-to-End Flow
+
+A complete loop: dispatch task → agent runs → events stream → UI updates → session ends.
+
+| Task | Description |
+|------|-------------|
+| Real Claude CLI test | Test adapter against actual `claude` binary |
+| Session lifecycle | Start → stream events → cost tracking → end/interrupt |
+| Task ↔ Session link | One task = one session, bidirectional state sync |
+| Verification pipeline | Run prechecks (lint/test/build) after session completes |
+| Persistence | Sessions + events saved to SQLite, survive restart |
+
+### Phase 4: Polish + Integrate
+
+| Task | Description |
+|------|-------------|
+| GitHub adapter | `gh` CLI for PR creation (verification pipeline stage 3) |
+| Jira adapter | REST API for issue sync |
+| Additional agent adapters | GSD, MetaMorph (research CLI output formats) |
+| File locking | Advisory locks to prevent agent-user collisions |
+| Tauri shell | Wrap the web app in Tauri for native desktop |
+
+## Key UI Views (from prototype exploration)
+
+| View | Role | Design Reference |
+|------|------|------------------|
+| **Ops** | Primary working view | `prototype/src/variants/ops/` |
+| **Kanban** | Overview/triage board | `prototype/src/variants/kanban/` |
+| **Brief** | Session start/dispatch | `prototype/src/variants/startup-brief/` |
+
+The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app extracts the Ops/Kanban/Brief designs into `apps/web/` with proper architecture.
