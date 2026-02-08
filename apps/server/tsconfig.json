@@ -8,11 +8,11 @@
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["bun-types"],
+    "paths": {
+      "@agent-manager/shared": ["../../packages/shared/src/index.ts"]
+    }
   },
-  "references": [
-    { "path": "packages/shared" },
-    { "path": "apps/server" }
-  ],
-  "files": []
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
