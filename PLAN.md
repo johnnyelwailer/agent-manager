@@ -1,7 +1,7 @@
 # Agent Manager — Implementation Plan
 
-> **Last Updated:** 2026-02-07
-> **Status:** Layer 1+2 complete. Layer 3 next.
+> **Last Updated:** 2026-02-08
+> **Status:** Layers 1+2+3 complete. Layer 4 next.
 
 ## Vision
 
@@ -64,15 +64,16 @@ Each adapter implements the same interface:
 | Claude CLI adapter | `src/adapters/claude-cli.ts` | Done | Wraps `claude -p --output-format stream-json` |
 | Tests | `src/adapters/claude-cli.test.ts` | Done | 10 tests passing (fake claude shell scripts) |
 
-### Layer 3: Transport + API Server — TODO
+### Layer 3: Transport + API Server — DONE
 
 Expose the engine over WebSocket so the React UI can connect.
 
 | Component | File | Status | Description |
 |-----------|------|--------|-------------|
-| WebSocket server | `src/server/ws.ts` | TODO | Streams `AgentEvent`s to connected UI clients |
-| REST endpoints | `src/server/api.ts` | TODO | Start/stop/list sessions, list adapters |
-| Server entry | `src/server/index.ts` | TODO | Combines WS + REST, starts listening |
+| WebSocket server | `src/server/ws.ts` | Done | Streams `AgentEvent`s to connected UI clients via subscribe/unsubscribe commands |
+| REST endpoints | `src/server/api.ts` | Done | Start/stop/list sessions, list adapters, check availability |
+| Server entry | `src/server/index.ts` | Done | `createServer()` factory combining WS + REST with CORS support |
+| Tests | `src/server/server.test.ts` | Done | 28 tests (17 REST + 11 WebSocket) |
 
 ### Layer 4: UI Integration — TODO
 
@@ -141,10 +142,15 @@ agent-manager/
 │   │   ├── process-manager.ts  # Child process spawn + NDJSON parsing
 │   │   ├── event-bus.ts        # Typed pub/sub
 │   │   └── session-manager.ts  # Multi-session orchestrator
-│   └── adapters/
-│       ├── adapter.ts          # Universal adapter interface
-│       ├── claude-cli.ts       # Claude Code CLI adapter
-│       └── claude-cli.test.ts  # 10 tests
+│   ├── adapters/
+│   │   ├── adapter.ts          # Universal adapter interface
+│   │   ├── claude-cli.ts       # Claude Code CLI adapter
+│   │   └── claude-cli.test.ts  # 10 tests
+│   └── server/
+│       ├── ws.ts               # WebSocket transport (subscribe/unsubscribe)
+│       ├── api.ts              # REST API handler (sessions, adapters)
+│       ├── index.ts            # createServer() factory
+│       └── server.test.ts      # 17 tests
 └── prototype/              # UI prototypes (14 variants, 92 screenshot tests)
     ├── src/variants/...
     ├── src/types/          # Primitives + Workflow type systems
@@ -153,8 +159,7 @@ agent-manager/
 
 ## Next Steps
 
-1. **Layer 3: WebSocket server** — expose sessions and events over WS so the React UI can subscribe to live agent activity
-2. **Layer 4: Wire Ops view** — replace mock data with real event stream; one issue, one task, one live agent
-3. **GSD/MetaMorph adapters** — research their CLI output formats and implement adapters
-4. **GitHub adapter** — `gh` CLI or GraphQL for PR creation (connects to the "PR" stage of verification pipeline)
-5. **Jira adapter** — REST API for issue sync
+1. **Layer 4: Wire Ops view** — replace mock data with real event stream; one issue, one task, one live agent
+2. **GSD/MetaMorph adapters** — research their CLI output formats and implement adapters
+3. **GitHub adapter** — `gh` CLI or GraphQL for PR creation (connects to the "PR" stage of verification pipeline)
+4. **Jira adapter** — REST API for issue sync
