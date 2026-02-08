@@ -65,6 +65,18 @@
   letter-spacing: 1.5px;
   color: #fafafa;
   margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e80;
+  flex-shrink: 0;
 }
 
 .briefDate {

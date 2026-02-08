@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import { EngineProvider } from './lib/EngineProvider.tsx';
 
 const CommandCenter = lazy(() => import('./variants/command-center/CommandCenter'));
 const Flow = lazy(() => import('./variants/flow/Flow'));
@@ -73,6 +74,7 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <EngineProvider>
     <BrowserRouter>
       <nav style={navStyle} data-testid="variant-nav">
         <span style={logoStyle}>UAH</span>
@@ -121,5 +123,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </EngineProvider>
   );
 }

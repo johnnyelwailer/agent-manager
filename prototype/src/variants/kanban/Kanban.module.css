@@ -62,6 +62,15 @@
   letter-spacing: -0.02em;
 }
 
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e80;
+  flex-shrink: 0;
+}
+
 .headerCenter {
   display: flex;
   align-items: center;

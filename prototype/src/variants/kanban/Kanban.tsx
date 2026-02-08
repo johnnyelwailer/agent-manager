@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import s from './Kanban.module.css';
-import { issues, agents, repos, tasks, getAgent, getRepo, totalCost } from '../../data/workflow-mock';
+import { useWorkflowData, useConnectionStatus } from '../../lib/EngineProvider.tsx';
 import type { Issue, Task, VerificationStage, TaskLogEntry } from '../../types/workflow';
 
 // ---------------------------------------------------------------------------
@@ -133,10 +133,13 @@ function getIssueCost(issue: Issue): number {
   return issue.tasks.reduce((sum, t) => sum + t.costUsd, 0);
 }
 
-function getRunningAgent(issue: Issue): { name: string; initials: string } | null {
+function getRunningAgent(
+  issue: Issue,
+  agentLookup: (id: string) => { id: string; name: string } | undefined,
+): { name: string; initials: string } | null {
   for (const task of issue.tasks) {
     if (task.status === 'running' && task.assignedAgent) {
-      const agent = getAgent(task.assignedAgent);
+      const agent = agentLookup(task.assignedAgent);
       if (agent) {
         const initials = agent.name
           .split(' ')
@@ -166,16 +169,6 @@ function getPrInfo(issue: Issue): { number: number; url: string } | null {
     }
   }
   return null;
-}
-
-function getAllVerificationStages(issue: Issue): VerificationStage[] {
-  const stages: VerificationStage[] = [];
-  for (const task of issue.tasks) {
-    for (const stage of task.verification.stages) {
-      stages.push(stage);
-    }
-  }
-  return stages;
 }
 
 function hasVerificationData(issue: Issue): boolean {
@@ -282,7 +275,10 @@ function MiniVerification({ issue }: { issue: Issue }) {
 // IssueCardExpanded
 // ---------------------------------------------------------------------------
 
-function IssueCardExpanded({ issue }: { issue: Issue }) {
+function IssueCardExpanded({ issue, getRepo }: {
+  issue: Issue;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
+}) {
   const prInfo = getPrInfo(issue);
 
   // Collect last 3 log entries from the most active task
@@ -429,15 +425,19 @@ function IssueCard({
   issue,
   expanded,
   onToggle,
+  getAgent,
+  getRepo,
 }: {
   issue: Issue;
   expanded: boolean;
   onToggle: () => void;
+  getAgent: (id: string) => { id: string; name: string } | undefined;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
 }) {
   const stateClass = getCardStateClass(issue);
   const repoIds = getIssueRepoIds(issue);
   const cost = getIssueCost(issue);
-  const runningAgent = getRunningAgent(issue);
+  const runningAgent = getRunningAgent(issue, getAgent);
   const prInfo = getPrInfo(issue);
   const isShimmering =
     (issue.status === 'analysis' || issue.status === 'planning') && issue.tasks.length > 0;
@@ -524,7 +524,7 @@ function IssueCard({
       </div>
 
       {/* Expanded detail panel */}
-      {expanded && <IssueCardExpanded issue={issue} />}
+      {expanded && <IssueCardExpanded issue={issue} getRepo={getRepo} />}
     </div>
   );
 }
@@ -538,11 +538,15 @@ function KanbanColumn({
   issues: columnIssues,
   expandedId,
   onToggle,
+  getAgent,
+  getRepo,
 }: {
   column: ColumnDef;
   issues: Issue[];
   expandedId: string | null;
   onToggle: (id: string) => void;
+  getAgent: (id: string) => { id: string; name: string } | undefined;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
 }) {
   return (
     <div className={s.column} data-testid={column.testId}>
@@ -560,6 +564,8 @@ function KanbanColumn({
               issue={issue}
               expanded={expandedId === issue.id}
               onToggle={() => onToggle(issue.id)}
+              getAgent={getAgent}
+              getRepo={getRepo}
             />
           ))
         )}
@@ -573,6 +579,8 @@ function KanbanColumn({
 // ---------------------------------------------------------------------------
 
 export default function Kanban() {
+  const { issues, agents, repos, tasks, totalCost, getAgent, getRepo } = useWorkflowData();
+  const { isLive } = useConnectionStatus();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleToggle = (issueId: string) => {
@@ -584,7 +592,6 @@ export default function Kanban() {
   const tasksInFlight = tasks.filter(
     (t) => t.status === 'running' || t.status === 'verifying'
   ).length;
-  const cost = totalCost();
 
   return (
     <div className={s.shell} data-testid="kanban-shell">
@@ -592,6 +599,7 @@ export default function Kanban() {
       <div className={s.header} data-testid="kanban-header">
         <div className={s.headerLeft}>
           <span className={s.headerTitle}>Workflow Board</span>
+          {isLive && <span className={s.liveDot} title="Connected to engine" />}
         </div>
 
         <div className={s.headerCenter}>
@@ -614,7 +622,7 @@ export default function Kanban() {
         </div>
 
         <div className={s.headerRight}>
-          <span className={s.costBadge}>${cost.toFixed(2)}</span>
+          <span className={s.costBadge}>${totalCost.toFixed(2)}</span>
           <button className={s.btnNewIssue}>+ New Issue</button>
         </div>
       </div>
@@ -630,6 +638,8 @@ export default function Kanban() {
               issues={columnIssues}
               expandedId={expandedId}
               onToggle={handleToggle}
+              getAgent={getAgent}
+              getRepo={getRepo}
             />
           );
         })}

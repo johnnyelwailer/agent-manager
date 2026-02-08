@@ -1,13 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import {
-  issues,
-  agents,
-  project,
-  repos,
-  getAgent,
-  getRepo,
-  totalCost,
-} from '../../data/workflow-mock';
+import { useWorkflowData, useConnectionStatus } from '../../lib/EngineProvider.tsx';
 import type {
   Issue,
   Task,
@@ -223,7 +215,10 @@ function VerificationPipelineView({
 // Sub-component: TaskLogFeed
 // ---------------------------------------------------------------------------
 
-function TaskLogFeed({ log }: { log: TaskLogEntry[] }) {
+function TaskLogFeed({ log, getRepo }: {
+  log: TaskLogEntry[];
+  getRepo: (id: string) => { id: string; name: string } | undefined;
+}) {
   const recentLog = log.slice(-8);
   if (recentLog.length === 0) return null;
 
@@ -270,10 +265,14 @@ function TaskCard({
   task,
   isExpanded,
   onToggle,
+  getAgent,
+  getRepo,
 }: {
   task: Task;
   isExpanded: boolean;
   onToggle: () => void;
+  getAgent: (id: string) => { id: string; name: string; model: string } | undefined;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
 }) {
   const [showFiles, setShowFiles] = useState(false);
   const agent = task.assignedAgent ? getAgent(task.assignedAgent) : undefined;
@@ -366,7 +365,7 @@ function TaskCard({
 
           {/* Agent log */}
           {(task.status === 'running' || task.log.length > 0) && (
-            <TaskLogFeed log={task.log} />
+            <TaskLogFeed log={task.log} getRepo={getRepo} />
           )}
         </div>
       )}
@@ -378,7 +377,10 @@ function TaskCard({
 // Sub-component: PlanSection
 // ---------------------------------------------------------------------------
 
-function PlanSection({ issue }: { issue: Issue }) {
+function PlanSection({ issue, getRepo }: {
+  issue: Issue;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const plan = issue.plan;
   if (!plan) return null;
@@ -469,10 +471,14 @@ function IssueDetail({
   issue,
   expandedTasks,
   onToggleTask,
+  getAgent,
+  getRepo,
 }: {
   issue: Issue | undefined;
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
+  getAgent: (id: string) => { id: string; name: string; model: string } | undefined;
+  getRepo: (id: string) => { id: string; name: string } | undefined;
 }) {
   if (!issue) {
     return (
@@ -529,7 +535,7 @@ function IssueDetail({
       </div>
 
       {/* Plan */}
-      {issue.plan && <PlanSection issue={issue} />}
+      {issue.plan && <PlanSection issue={issue} getRepo={getRepo} />}
 
       {/* Tasks */}
       <div className={styles.section} data-testid="ops-tasks">
@@ -551,6 +557,8 @@ function IssueDetail({
               task={task}
               isExpanded={expandedTasks.has(task.id)}
               onToggle={() => onToggleTask(task.id)}
+              getAgent={getAgent}
+              getRepo={getRepo}
             />
           ))
         )}
@@ -564,6 +572,7 @@ function IssueDetail({
 // ---------------------------------------------------------------------------
 
 function IssueList({
+  issues,
   selectedIssueId,
   onSelectIssue,
   filterText,
@@ -571,6 +580,7 @@ function IssueList({
   collapsedGroups,
   onToggleGroup,
 }: {
+  issues: Issue[];
   selectedIssueId: string;
   onSelectIssue: (id: string) => void;
   filterText: string;
@@ -587,7 +597,7 @@ function IssueList({
         (i.externalId && i.externalId.toLowerCase().includes(lower)) ||
         i.labels.some((l) => l.toLowerCase().includes(lower))
     );
-  }, [filterText]);
+  }, [filterText, issues]);
 
   const grouped = useMemo(() => {
     const map = new Map<IssueStatus, Issue[]>();
@@ -681,32 +691,40 @@ function IssueList({
 // ---------------------------------------------------------------------------
 
 export default function Ops() {
-  const [selectedIssueId, setSelectedIssueId] = useState('issue-1');
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(() => {
-    // Auto-expand running or failed tasks of the default selected issue
-    const defaultIssue = issues.find((i) => i.id === 'issue-1');
-    const expanded = new Set<string>();
-    if (defaultIssue) {
-      for (const t of defaultIssue.tasks) {
+  const { issues, agents, project, repos, totalCost, getAgent, getRepo } = useWorkflowData();
+  const { isLive } = useConnectionStatus();
+
+  const [selectedIssueId, setSelectedIssueId] = useState('');
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [filterText, setFilterText] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<IssueStatus>>(new Set());
+  const [initialized, setInitialized] = useState(false);
+
+  // Auto-select first issue on load or when issues change
+  useMemo(() => {
+    if (issues.length > 0 && !initialized) {
+      const firstId = issues[0].id;
+      setSelectedIssueId(firstId);
+      const firstIssue = issues[0];
+      const expanded = new Set<string>();
+      for (const t of firstIssue.tasks) {
         if (t.status === 'running' || t.status === 'failed') {
           expanded.add(t.id);
         }
       }
+      setExpandedTasks(expanded);
+      setInitialized(true);
     }
-    return expanded;
-  });
-  const [filterText, setFilterText] = useState('');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<IssueStatus>>(new Set());
+  }, [issues, initialized]);
 
   const selectedIssue = useMemo(
     () => issues.find((i) => i.id === selectedIssueId),
-    [selectedIssueId]
+    [selectedIssueId, issues]
   );
 
   const handleSelectIssue = useCallback(
     (id: string) => {
       setSelectedIssueId(id);
-      // Auto-expand running/failed tasks on the new issue
       const issue = issues.find((i) => i.id === id);
       if (issue) {
         const expanded = new Set<string>();
@@ -720,7 +738,7 @@ export default function Ops() {
         setExpandedTasks(new Set());
       }
     },
-    []
+    [issues]
   );
 
   const handleToggleTask = useCallback((taskId: string) => {
@@ -748,7 +766,6 @@ export default function Ops() {
   }, []);
 
   const activeAgentCount = agents.filter((a) => a.status === 'running').length;
-  const cost = totalCost();
 
   return (
     <div className={styles.shell} data-testid="ops-shell">
@@ -757,6 +774,7 @@ export default function Ops() {
         <div className={styles.projectInfo}>
           <div className={styles.projectAvatar}>U</div>
           <span className={styles.projectName}>{project.name}</span>
+          {isLive && <span className={styles.liveDot} title="Connected to engine" />}
         </div>
         <div className={styles.topbarCenter}>
           <span className={styles.repoBadge}>
@@ -764,7 +782,7 @@ export default function Ops() {
           </span>
         </div>
         <div className={styles.topbarRight}>
-          <span className={styles.costBadge}>${cost.toFixed(2)}</span>
+          <span className={styles.costBadge}>${totalCost.toFixed(2)}</span>
           <span className={styles.agentCountBadge}>
             {activeAgentCount} agent{activeAgentCount !== 1 ? 's' : ''} active
           </span>
@@ -774,6 +792,7 @@ export default function Ops() {
 
       {/* Left Panel: Issue List */}
       <IssueList
+        issues={issues}
         selectedIssueId={selectedIssueId}
         onSelectIssue={handleSelectIssue}
         filterText={filterText}
@@ -787,6 +806,8 @@ export default function Ops() {
         issue={selectedIssue}
         expandedTasks={expandedTasks}
         onToggleTask={handleToggleTask}
+        getAgent={getAgent}
+        getRepo={getRepo}
       />
     </div>
   );

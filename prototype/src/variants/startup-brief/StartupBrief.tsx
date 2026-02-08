@@ -1,5 +1,9 @@
-import { useMemo, useState } from 'react';
-import { agents, executions, verifications, strategies } from '../../data/mock';
+import { useState } from 'react';
+import {
+  usePrimitivesData,
+  useStrategies,
+  useConnectionStatus,
+} from '../../lib/EngineProvider.tsx';
 import type { StrategyPrimitive } from '../../types/primitives';
 import s from './StartupBrief.module.css';
 
@@ -25,7 +29,13 @@ function countTotalLeaves(node: StrategyPrimitive): number {
 
 // ── Session Summary Section ──
 
-function SessionSummary() {
+function SessionSummary({
+  agents,
+  executions,
+}: {
+  agents: { id: string; name: string }[];
+  executions: { id: string; title: string; status: string; assignedAgent?: string; log: { type: string; content: string }[] }[];
+}) {
   const completed = executions.filter((e) => e.status === 'completed');
   const running = executions.filter((e) => e.status === 'running');
   const failed = executions.filter((e) => e.status === 'failed');
@@ -105,7 +115,13 @@ function SessionSummary() {
 
 // ── Needs Your Attention Section ──
 
-function AttentionSection() {
+function AttentionSection({
+  executions,
+  verifications,
+}: {
+  executions: { id: string; title: string; status: string; log: { type: string; content: string }[] }[];
+  verifications: { id: string; executionId: string; type: string; status: string; details: string }[];
+}) {
   const failedExecs = executions.filter((e) => e.status === 'failed');
   const reviewVers = verifications.filter((v) => v.status === 'needs_review');
   const approvalVers = verifications.filter(
@@ -183,7 +199,7 @@ function AttentionSection() {
 
 // ── Strategy Progress Section ──
 
-function StrategyProgress() {
+function StrategyProgress({ strategies }: { strategies: StrategyPrimitive[] }) {
   return (
     <div className={s.section} data-testid="startup-brief-strategy">
       <div className={s.sectionHeader}>
@@ -226,7 +242,11 @@ function StrategyProgress() {
 
 // ── Cost Summary Section ──
 
-function CostSummary() {
+function CostSummary({
+  agents,
+}: {
+  agents: { id: string; name: string; costUsd: number; tokensUsed: number }[];
+}) {
   const totalCost = agents.reduce((sum, a) => sum + a.costUsd, 0);
   const totalTokens = agents.reduce((sum, a) => sum + a.tokensUsed, 0);
 
@@ -264,7 +284,11 @@ function CostSummary() {
 
 // ── Quick Actions Section ──
 
-function QuickActions() {
+function QuickActions({
+  verifications,
+}: {
+  verifications: { id: string; type: string; status: string }[];
+}) {
   const reviewCount = verifications.filter(
     (v) => v.status === 'needs_review' || (v.status === 'pending' && v.type === 'human_approval'),
   ).length;
@@ -347,22 +371,32 @@ function ChatPanel() {
 // ── Main Component ──
 
 export default function StartupBrief() {
-  const briefDate = 'February 7, 2026';
+  const { agents, executions, verifications } = usePrimitivesData();
+  const strategies = useStrategies();
+  const { isLive } = useConnectionStatus();
+  const briefDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return (
     <div className={s.shell} data-testid="startup-brief-shell">
       <div className={s.briefPanel} data-testid="startup-brief-content">
         <div className={s.briefHeader}>
-          <h1 className={s.briefTitle}>Mission Brief</h1>
+          <h1 className={s.briefTitle}>
+            Mission Brief
+            {isLive && <span className={s.liveDot} title="Connected to engine" />}
+          </h1>
           <div className={s.briefDate}>{briefDate}</div>
           <div className={s.briefDivider} />
         </div>
 
-        <SessionSummary />
-        <AttentionSection />
-        <StrategyProgress />
-        <CostSummary />
-        <QuickActions />
+        <SessionSummary agents={agents} executions={executions} />
+        <AttentionSection executions={executions} verifications={verifications} />
+        <StrategyProgress strategies={strategies} />
+        <CostSummary agents={agents} />
+        <QuickActions verifications={verifications} />
       </div>
 
       <ChatPanel />
