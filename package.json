@@ -1,24 +1,13 @@
 {
   "name": "agent-manager",
-  "version": "0.1.0",
-  "type": "module",
-  "description": "Local agent orchestration engine — spawns, observes, and manages AI agent sessions via CLI adapters",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "build": "tsc",
-    "test": "node --test --experimental-strip-types src/**/*.test.ts",
-    "check": "tsc --noEmit"
-  },
-  "engines": {
-    "node": ">=22.0.0"
+    "dev": "bun run --filter '@agent-manager/server' dev",
+    "test": "bun run --filter '*' test",
+    "check": "bun run --filter '*' check"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/ws": "^8.18.1",
     "typescript": "~5.9.3"
-  },
-  "dependencies": {
-    "ws": "^8.19.0"
   }
 }

@@ -7,12 +7,10 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
+    "declaration": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["bun-types"]
   },
-  "references": [
-    { "path": "packages/shared" },
-    { "path": "apps/server" }
-  ],
-  "files": []
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
