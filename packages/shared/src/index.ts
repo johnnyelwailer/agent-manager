@@ -117,3 +117,27 @@ export type {
   WsUnsubscribed,
   WsError,
 } from './schemas/ws.js';
+
+export {
+  copilotSessionEventSchema,
+  copilotAssistantMessageSchema,
+  copilotAssistantMessageDeltaSchema,
+  copilotAssistantReasoningSchema,
+  copilotAssistantReasoningDeltaSchema,
+  copilotToolExecutionStartSchema,
+  copilotToolExecutionCompleteSchema,
+  copilotUserMessageSchema,
+  copilotSessionIdleSchema,
+} from './schemas/copilot-sdk.js';
+
+export type {
+  CopilotSessionEvent,
+  CopilotAssistantMessage,
+  CopilotAssistantMessageDelta,
+  CopilotAssistantReasoning,
+  CopilotAssistantReasoningDelta,
+  CopilotToolExecutionStart,
+  CopilotToolExecutionComplete,
+  CopilotUserMessage,
+  CopilotSessionIdle,
+} from './schemas/copilot-sdk.js';

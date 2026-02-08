@@ -1,5 +1,6 @@
 import { SessionManager } from './core/session-manager.js';
 import { ClaudeCliAdapter } from './adapters/claude-cli.js';
+import { CopilotSdkAdapter } from './adapters/copilot-sdk.js';
 import { createApp } from './app.js';
 import { WsHandler, type WsClientState } from './routes/ws.js';
 
@@ -8,6 +9,7 @@ const host = process.env.HOST ?? '127.0.0.1';
 
 const manager = new SessionManager();
 manager.registerAdapter(new ClaudeCliAdapter());
+manager.registerAdapter(new CopilotSdkAdapter());
 
 const app = createApp(manager);
 const wsHandler = new WsHandler(manager.bus);
