@@ -26,12 +26,6 @@ interface ClientState {
   sessions: Map<string, () => void>;
 }
 
-type ClientCommand =
-  | { type: 'subscribe'; scope: 'all' }
-  | { type: 'subscribe'; scope: 'session'; sessionId: string }
-  | { type: 'unsubscribe'; scope: 'all' }
-  | { type: 'unsubscribe'; scope: 'session'; sessionId: string };
-
 // ---------------------------------------------------------------------------
 // WebSocket transport
 // ---------------------------------------------------------------------------
@@ -89,7 +83,7 @@ export class WsTransport {
 
     ws.on('message', (data) => {
       try {
-        const cmd = JSON.parse(String(data)) as ClientCommand;
+        const cmd = JSON.parse(String(data)) as Record<string, unknown>;
         this.handleCommand(ws, state, cmd);
       } catch {
         this.send(ws, { type: 'error', message: 'Invalid JSON' });
@@ -107,39 +101,54 @@ export class WsTransport {
     });
   }
 
-  private handleCommand(ws: WebSocket, state: ClientState, cmd: ClientCommand): void {
-    switch (cmd.type) {
-      case 'subscribe':
-        if (cmd.scope === 'all') {
-          if (state.subscribedAll) return; // already subscribed
-          state.subscribedAll = true;
-          state.unsubAll = this.bus.onAll((event) => {
-            this.send(ws, event);
-          });
-          this.send(ws, { type: 'subscribed', scope: 'all' });
-        } else if (cmd.scope === 'session' && cmd.sessionId) {
-          if (state.sessions.has(cmd.sessionId)) return; // already subscribed
-          const unsub = this.bus.on(cmd.sessionId, (event) => {
-            this.send(ws, event);
-          });
-          state.sessions.set(cmd.sessionId, unsub);
-          this.send(ws, { type: 'subscribed', scope: 'session', sessionId: cmd.sessionId });
-        }
-        break;
+  private handleCommand(ws: WebSocket, state: ClientState, cmd: Record<string, unknown>): void {
+    const type = cmd.type as string | undefined;
+    const scope = cmd.scope as string | undefined;
+    const sessionId = cmd.sessionId as string | undefined;
 
-      case 'unsubscribe':
-        if (cmd.scope === 'all') {
-          state.unsubAll?.();
-          state.unsubAll = undefined;
-          state.subscribedAll = false;
-          this.send(ws, { type: 'unsubscribed', scope: 'all' });
-        } else if (cmd.scope === 'session' && cmd.sessionId) {
-          const unsub = state.sessions.get(cmd.sessionId);
-          unsub?.();
-          state.sessions.delete(cmd.sessionId);
-          this.send(ws, { type: 'unsubscribed', scope: 'session', sessionId: cmd.sessionId });
-        }
-        break;
+    if (type !== 'subscribe' && type !== 'unsubscribe') {
+      this.send(ws, { type: 'error', message: `Unknown command type: "${type}"` });
+      return;
+    }
+
+    if (scope !== 'all' && scope !== 'session') {
+      this.send(ws, { type: 'error', message: `Invalid scope: "${scope}". Use "all" or "session"` });
+      return;
+    }
+
+    if (scope === 'session' && !sessionId) {
+      this.send(ws, { type: 'error', message: 'sessionId is required when scope is "session"' });
+      return;
+    }
+
+    if (type === 'subscribe') {
+      if (scope === 'all') {
+        if (state.subscribedAll) return; // already subscribed
+        state.subscribedAll = true;
+        state.unsubAll = this.bus.onAll((event) => {
+          this.send(ws, event);
+        });
+        this.send(ws, { type: 'subscribed', scope: 'all' });
+      } else {
+        if (state.sessions.has(sessionId!)) return; // already subscribed
+        const unsub = this.bus.on(sessionId!, (event) => {
+          this.send(ws, event);
+        });
+        state.sessions.set(sessionId!, unsub);
+        this.send(ws, { type: 'subscribed', scope: 'session', sessionId });
+      }
+    } else {
+      if (scope === 'all') {
+        state.unsubAll?.();
+        state.unsubAll = undefined;
+        state.subscribedAll = false;
+        this.send(ws, { type: 'unsubscribed', scope: 'all' });
+      } else {
+        const unsub = state.sessions.get(sessionId!);
+        unsub?.();
+        state.sessions.delete(sessionId!);
+        this.send(ws, { type: 'unsubscribed', scope: 'session', sessionId });
+      }
     }
   }
 

@@ -89,6 +89,13 @@ export async function createServer(options: ServerOptions = {}): Promise<AgentSe
   const address = http.address();
   const actualPort = typeof address === 'object' && address ? address.port : port;
 
+  // Track open connections so we can destroy them on close
+  const connections = new Set<import('node:net').Socket>();
+  http.on('connection', (socket) => {
+    connections.add(socket);
+    socket.on('close', () => connections.delete(socket));
+  });
+
   return {
     http,
     ws,
@@ -98,6 +105,11 @@ export async function createServer(options: ServerOptions = {}): Promise<AgentSe
     async close() {
       ws.close();
       manager.terminateAll();
+      // Destroy lingering keep-alive connections so http.close() doesn't hang
+      for (const socket of connections) {
+        socket.destroy();
+      }
+      connections.clear();
       await new Promise<void>((resolve, reject) => {
         http.close((err) => (err ? reject(err) : resolve()));
       });

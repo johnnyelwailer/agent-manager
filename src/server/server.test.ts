@@ -132,10 +132,12 @@ function waitForMessage(ws: WebSocket, timeoutMs = 2000): Promise<unknown> {
   });
 }
 
-function closeWs(ws: WebSocket): Promise<void> {
+function closeWs(ws: WebSocket, timeoutMs = 2000): Promise<void> {
   return new Promise((resolve) => {
     if (ws.readyState === ws.CLOSED) { resolve(); return; }
-    ws.on('close', () => resolve());
+    const timer = setTimeout(() => { ws.terminate(); resolve(); }, timeoutMs);
+    timer.unref();
+    ws.on('close', () => { clearTimeout(timer); resolve(); });
     ws.close();
   });
 }
@@ -261,6 +263,55 @@ describe('REST API', () => {
     const res = await fetch(`${baseUrl}/api/sessions`, { method: 'OPTIONS' });
     assert.equal(res.status, 204);
   });
+
+  it('POST /api/sessions rejects invalid JSON body', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      body: '{not valid json',
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { error: string };
+    assert.ok(body.error.includes('Invalid JSON'), `expected "Invalid JSON" in error, got "${body.error}"`);
+  });
+
+  it('GET /api/adapters/:id/available reports unavailable adapter', async () => {
+    mockAdapter.available = false;
+    try {
+      const res = await fetch(`${baseUrl}/api/adapters/mock/available`);
+      assert.equal(res.status, 200);
+      const body = await res.json() as { available: boolean; error: string };
+      assert.equal(body.available, false);
+      assert.ok(body.error);
+    } finally {
+      mockAdapter.available = true;
+    }
+  });
+
+  it('POST /api/sessions/:id/interrupt returns 404 for unknown session', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions/nonexistent/interrupt`, { method: 'POST' });
+    assert.equal(res.status, 404);
+  });
+
+  it('POST /api/sessions/:id/terminate returns 404 for unknown session', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions/nonexistent/terminate`, { method: 'POST' });
+    assert.equal(res.status, 404);
+  });
+
+  it('POST /api/sessions/:id/kill returns 404 for unknown session', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions/nonexistent/kill`, { method: 'POST' });
+    assert.equal(res.status, 404);
+  });
+
+  it('GET /api/sessions list omits events but includes eventCount', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions`);
+    assert.equal(res.status, 200);
+    const body = await res.json() as { sessions: { events?: unknown; eventCount: number }[] };
+    assert.ok(body.sessions.length > 0, 'should have sessions from previous tests');
+    for (const s of body.sessions) {
+      assert.equal(s.events, undefined, 'events should be omitted from list view');
+      assert.equal(typeof s.eventCount, 'number', 'eventCount should be present');
+    }
+  });
 });
 
 describe('WebSocket transport', () => {
@@ -366,5 +417,75 @@ describe('WebSocket transport', () => {
 
     await closeWs(ws1);
     await closeWs(ws2);
+  });
+
+  it('returns error for unknown command type', async () => {
+    const ws = await connectWs(server.port);
+
+    ws.send(JSON.stringify({ type: 'unknown' }));
+    const msg = await waitForMessage(ws) as { type: string; message: string };
+    assert.equal(msg.type, 'error');
+    assert.ok(msg.message.includes('Unknown command'));
+
+    await closeWs(ws);
+  });
+
+  it('returns error for missing scope', async () => {
+    const ws = await connectWs(server.port);
+
+    ws.send(JSON.stringify({ type: 'subscribe' }));
+    const msg = await waitForMessage(ws) as { type: string; message: string };
+    assert.equal(msg.type, 'error');
+    assert.ok(msg.message.includes('Invalid scope'));
+
+    await closeWs(ws);
+  });
+
+  it('returns error for session scope without sessionId', async () => {
+    const ws = await connectWs(server.port);
+
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'session' }));
+    const msg = await waitForMessage(ws) as { type: string; message: string };
+    assert.equal(msg.type, 'error');
+    assert.ok(msg.message.includes('sessionId is required'));
+
+    await closeWs(ws);
+  });
+
+  it('unsubscribes from a specific session', async () => {
+    const ws = await connectWs(server.port);
+
+    const info = await server.manager.startSession('mock', {
+      prompt: 'unsub session test',
+      cwd: '/tmp',
+    });
+
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'session', sessionId: info.sessionId }));
+    const subAck = await waitForMessage(ws) as { type: string };
+    assert.equal(subAck.type, 'subscribed');
+
+    ws.send(JSON.stringify({ type: 'unsubscribe', scope: 'session', sessionId: info.sessionId }));
+    const unsubAck = await waitForMessage(ws) as { type: string; sessionId: string };
+    assert.equal(unsubAck.type, 'unsubscribed');
+    assert.equal(unsubAck.sessionId, info.sessionId);
+
+    await closeWs(ws);
+  });
+
+  it('ignores duplicate subscribe to all', async () => {
+    const ws = await connectWs(server.port);
+
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'all' }));
+    const ack1 = await waitForMessage(ws) as { type: string };
+    assert.equal(ack1.type, 'subscribed');
+
+    // Second subscribe should be silently ignored (no ack)
+    ws.send(JSON.stringify({ type: 'subscribe', scope: 'all' }));
+    // Send a known command after to confirm the duplicate was skipped
+    ws.send(JSON.stringify({ type: 'unsubscribe', scope: 'all' }));
+    const next = await waitForMessage(ws) as { type: string };
+    assert.equal(next.type, 'unsubscribed', 'duplicate subscribe should be silently skipped');
+
+    await closeWs(ws);
   });
 });

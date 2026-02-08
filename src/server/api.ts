@@ -127,11 +127,12 @@ export class ApiHandler {
   }
 
   private async startSession(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const body = await this.readBody<StartSessionBody>(req);
-    if (!body) {
-      this.json(res, 400, { error: 'Request body is required' });
+    const result = await this.readBody<StartSessionBody>(req);
+    if ('error' in result) {
+      this.json(res, 400, { error: result.error === 'empty' ? 'Request body is required' : result.error });
       return;
     }
+    const body = result.data;
     if (!body.adapterId || !body.prompt || !body.cwd) {
       this.json(res, 400, { error: 'adapterId, prompt, and cwd are required' });
       return;
@@ -195,23 +196,38 @@ export class ApiHandler {
     res.end(JSON.stringify(data));
   }
 
-  private readBody<T>(req: IncomingMessage): Promise<T | null> {
+  /** Max request body size (1 MB). Prevents unbounded memory usage. */
+  private static MAX_BODY_BYTES = 1024 * 1024;
+
+  private readBody<T>(req: IncomingMessage): Promise<{ data: T } | { error: string }> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
-      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      let size = 0;
+
+      req.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > ApiHandler.MAX_BODY_BYTES) {
+          req.destroy();
+          resolve({ error: 'Request body too large' });
+          return;
+        }
+        chunks.push(chunk);
+      });
+
       req.on('end', () => {
         const raw = Buffer.concat(chunks).toString('utf-8');
         if (!raw) {
-          resolve(null);
+          resolve({ error: 'empty' });
           return;
         }
         try {
-          resolve(JSON.parse(raw) as T);
+          resolve({ data: JSON.parse(raw) as T });
         } catch {
-          resolve(null);
+          resolve({ error: 'Invalid JSON in request body' });
         }
       });
-      req.on('error', () => resolve(null));
+
+      req.on('error', () => resolve({ error: 'Request read error' }));
     });
   }
 }

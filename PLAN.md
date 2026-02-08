@@ -73,7 +73,7 @@ Expose the engine over WebSocket so the React UI can connect.
 | WebSocket server | `src/server/ws.ts` | Done | Streams `AgentEvent`s to connected UI clients via subscribe/unsubscribe commands |
 | REST endpoints | `src/server/api.ts` | Done | Start/stop/list sessions, list adapters, check availability |
 | Server entry | `src/server/index.ts` | Done | `createServer()` factory combining WS + REST with CORS support |
-| Tests | `src/server/server.test.ts` | Done | 17 tests (11 REST + 6 WebSocket) |
+| Tests | `src/server/server.test.ts` | Done | 28 tests (17 REST + 11 WebSocket) |
 
 ### Layer 4: UI Integration — TODO
 
