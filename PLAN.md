@@ -1,13 +1,131 @@
 # Agent Manager — Implementation Plan
 
-> **Last Updated:** 2026-02-09
-> **Status:** Phase 1 complete (engine ported). Expanding scope: universal agent UI framework with contracts, workflow plugins, multi-agent, remote access.
+> **Last Updated:** 2026-02-10
+> **Status:** Phase 1 complete (engine ported). Differentiation defined: universal agent shell for full project workflows.
 
 ## Vision
 
-A **universal agent UI framework** — a high-performance desktop application (with remote web access) that provides rich, composable UI components for common agent concepts (commands, skills, tasks, research docs, worktrees, MCPs, hooks) and in-chat interactive elements (choice-pickers, confirmations, file selectors). It orchestrates AI agent sessions across multiple runtimes (Claude Code, GSD, MetaMorph, and any future agent), providing a unified interface for dispatching tasks, observing agent work in real-time, and verifying outputs — integrated with Jira and GitHub Enterprise.
+**The universal agent shell for full project workflows.**
+
+A high-performance desktop app (with remote web access) that provides the *operating environment* for AI coding agents. Not an IDE, not a terminal multiplexer, not locked to one agent — a standalone shell that renders rich UI for the concepts agents expose (commands, skills, tasks, MCPs, hooks, worktrees) through standards-based contracts, supports any agent via adapters, and enables full project workflows without forcing a specific methodology.
+
+Standards-first: MCP for tools, AG-UI for streaming, A2A for discovery. Skills, commands, and hooks are first-class UI citizens with auto-discovery. Workflow plugins (GSD, custom) provide opinionated flows that map onto the primitive UI components. Any agent runtime plugs in through one adapter.
 
 The framework defines **abstract contracts** for agent concepts that allow both generic and specialized UI rendering, and supports **pluggable workflow systems** where opinionated high-level flows (like GSD's plan→execute→verify) map onto the primitive UI components. The desktop app also exposes a **remote access layer**, allowing authenticated users to connect to a running instance from any web browser, including mobile devices.
+
+## Competitive Landscape
+
+The space is crowded but fragmented. Every tool occupies a specific niche. Nothing occupies ours.
+
+### Existing Categories
+
+**1. IDE Extensions (locked to one editor)**
+- **Cline** (4M+ installs) — VS Code extension, single-agent Plan/Act pipeline, MCP tools, model-agnostic but locked to VS Code. No multi-agent.
+- **Roo Code** — VS Code fork of Cline with multi-agent roles, but still VS Code-only.
+- **Continue.dev** — VS Code/JetBrains extension, open-source, best MCP integration, model-agnostic. But it's an *extension*, not a shell.
+- **Cursor** — Full IDE (VS Code fork), deep agent integration, background agents, worktrees. But it IS the IDE — you can't use it alongside your existing editor.
+
+**2. Terminal Session Managers (no rich UI)**
+- **Agent Deck** (Go + Bubble Tea TUI) — multi-agent sessions via tmux, MCP management, worktrees, session forking. Smart status detection. But it's a TUI — no graphical UI, no workflow representation, no chat elements.
+- **Agent of Empires** — multi-agent via tmux + Docker sandboxing. Similar limitations.
+- **Conduit**, **TmuxCC** — same category, less featured.
+- **Agents UI** (macOS, Tauri) — native terminal app for multi-agent sessions. Closest to us architecturally but terminal-first, no agent concept UI, no workflows.
+
+**3. Autonomous Agent Platforms (opinionated, closed)**
+- **Devin** — full VM-based autonomous agent. Rich UI (planner, timeline, browser, editor). But it's *Devin's* UI for *Devin's* agent. Not extensible. Not a shell.
+- **Jules** — Google's async agent. Cloud-only. Rich activity model. But closed platform.
+- **OpenAI Codex App** (macOS, Feb 2026) — multi-agent management, skills as first-class objects. But OpenAI-only.
+
+**4. Agent Frameworks / SDKs (developer tools, not end-user UIs)**
+- **OpenHands** (64k stars) — event-sourced SDK + web UI. Modular V1 architecture. But the UI is a single-agent coding interface, not a multi-agent project shell.
+- **CopilotKit** (28.6k stars) — AG-UI protocol, generative UI, multi-agent orchestration. But it's an *in-app framework* — for embedding agents in YOUR app, not a standalone shell.
+- **Goose** (27k stars, Block) — CLI + desktop, MCP-native, 3000+ MCP servers. But single-agent, no workflow system, minimal UI.
+- **LangGraph** — agent state machines. Backend framework, no UI.
+
+**5. Platform Agent Hubs (locked to platform)**
+- **VS Code Agent HQ** — unified multi-agent dashboard within VS Code. Multi-vendor (Copilot, Claude, Codex). But it's inside VS Code — you must use VS Code.
+- **GitHub Copilot Workspace** — most sophisticated staged workflow (spec→plan→implement→verify). But GitHub-only, Copilot-only.
+
+**6. Standards Emerging (protocols, not products)**
+- **AG-UI** (CopilotKit) — agent↔frontend streaming protocol
+- **A2UI** (Google) — declarative agent-generated UI specification
+- **MCP** (Anthropic/Linux Foundation) — agent↔tool protocol
+- **A2A** (Google/Linux Foundation) — agent↔agent discovery
+- **AGENTS.md** (OpenAI/Linux Foundation) — project-level agent instructions
+
+### The Gap
+
+| What exists | What's missing |
+|-------------|---------------|
+| IDE extensions with agent features | A standalone shell that works with *any* editor/terminal |
+| TUI session managers for multi-agent | Rich graphical UI for agent concepts (skills, MCPs, hooks, workflows) |
+| Opinionated agent platforms (Devin, Jules) | An *open*, *extensible* shell that any agent can plug into |
+| Agent frameworks for developers | An *end-user* product for managing project-level agent work |
+| Per-agent UIs (each agent has its own) | A *unified* UI that renders any agent's concepts through contracts |
+| Workflow tools (Copilot Workspace) | Workflow support that's *not locked to one agent* |
+| Protocol standards (AG-UI, MCP, A2A) | A product that *implements all of them together* as a coherent shell |
+
+**No one builds the operating environment.** Everyone builds the agent or the IDE or the framework. The gap is: a **standalone, agent-agnostic project shell** with rich UI for the *concepts agents expose* — not the agents themselves.
+
+## Differentiation
+
+### What We Are
+
+**A universal agent shell for full project workflows.**
+
+Not an IDE. Not a framework. Not a TUI. Not locked to one agent. A standalone desktop app (with remote web access) that provides:
+
+1. **Rich, first-party UI for agent primitives** — commands, skills, tasks, MCPs, hooks, worktrees, research docs are not just listed but have dedicated, interactive, beautiful components that any agent can populate through contracts
+2. **Full project workflow support** — from "what should I work on?" to "is this done?" — without forcing a specific methodology. The shell supports plan-first, execution-first, or any workflow pattern through the plugin system
+3. **Standards-based extensibility** — MCP for tools, AG-UI for streaming, A2A for discovery. Skills, commands, hooks are first-class concepts with auto-discovery. Not our own proprietary extension format.
+4. **Adapter-based multi-agent** — Claude Code, OpenHands, Goose, GSD, MetaMorph, or any CLI agent. One adapter = full UI integration.
+
+### What We Are NOT
+
+- **Not an IDE** — we don't replace your editor. We run alongside it (like Devin's web UI, but local and multi-agent).
+- **Not a terminal multiplexer** — Agent Deck/Conduit manage terminal sessions. We provide *graphical UI* for agent *concepts*.
+- **Not a framework for embedding AI** — CopilotKit helps you build AI into YOUR app. We ARE the app.
+- **Not locked to one agent** — unlike Devin, Jules, Copilot Workspace, or Codex App.
+- **Not locked to one workflow** — unlike Copilot Workspace's spec→plan→implement→verify.
+
+### The "Operating Environment" Metaphor
+
+Think of it as the **desktop environment for AI agents**:
+
+| Desktop OS Concept | Agent Shell Equivalent |
+|-------------------|----------------------|
+| Window Manager | Session Manager (multiple agent sessions in panels/tabs) |
+| File Manager | Worktree Browser (navigate repos/branches agents work in) |
+| System Preferences | Adapter Configuration (model, auth, MCP servers, hooks) |
+| Task Manager | Agent Dashboard (running sessions, resource usage, cost) |
+| App Store | Adapter + Workflow Plugin Registry |
+| Notification Center | Event Stream (agent progress, errors, input-required) |
+| Launcher / Dock | Command Palette + Skill Picker + Workflow Starter |
+
+### Key Differentiators vs. Closest Competitors
+
+| vs. | Their approach | Our differentiation |
+|-----|---------------|-------------------|
+| **Agent Deck** | TUI over tmux. Multi-agent sessions. | Rich graphical UI. Agent concept components (skills, MCPs, hooks). Workflow system. Remote access. |
+| **Agents UI** | Native terminal app (Tauri). Multi-session. | Same tech (Tauri), but we add contract-driven concept UI, workflow plugins, responsive web access. |
+| **VS Code Agent HQ** | Multi-agent dashboard inside VS Code. | Standalone — works with any editor. Deeper agent concept UI. Not locked to VS Code ecosystem. |
+| **Devin** | Richest agent UI (planner, timeline, browser). | Open + multi-agent. Not locked to Cognition's agent. Adapter pattern means any agent gets the UI. |
+| **CopilotKit** | Framework for building agent-native apps. | End-user product, not a framework. We USE AG-UI protocol; they provide it. |
+| **OpenHands** | Event-sourced SDK + web UI. | We're a shell, not an SDK. Could integrate OpenHands as an adapter. |
+| **Goose** | CLI + desktop, MCP-native. | Richer UI, workflow system, multi-agent. Goose could be an adapter. |
+
+### Adapter Strategy (Priority Order)
+
+| Adapter | Priority | Why | Difficulty |
+|---------|----------|-----|-----------|
+| **Claude Code CLI** | P0 | Primary user base. Richest concept surface (skills, commands, hooks, MCPs, worktrees, subagents). Best stream-json protocol. | Implemented |
+| **OpenHands** | P1 | 64k stars, event-sourced architecture maps cleanly to our event bus. REST+WS API already exists. Open source. | Medium — existing API |
+| **Goose** | P1 | 27k stars, MCP-native, CLI + desktop. Apache 2.0. Large community. | Medium — CLI wrapper |
+| **Codex CLI** | P2 | OpenAI's agent. NDJSON output, MCP server mode. Large enterprise user base. | Easy — NDJSON similar to Claude |
+| **Aider** | P2 | Popular terminal agent, architect/editor split. | Easy — terminal output parsing |
+| **GSD** | P2 | Opinionated workflow (constitution→plan→execute→verify). First workflow plugin candidate. | Medium — workflow mapping |
+| **MetaMorph** | P3 | Multi-agent orchestration. | Research needed |
+| **Continue.dev** | P3 | Model-agnostic, MCP-first. Could be complementary. | Research needed |
 
 ## Hard Constraints
 
