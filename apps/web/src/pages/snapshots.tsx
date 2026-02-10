@@ -52,9 +52,9 @@ import type { SessionInfo } from '@agent-manager/shared';
 // Section wrapper
 // ---------------------------------------------------------------------------
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" data-testid={testId}>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <Separator />
       <div className="space-y-4">{children}</div>
@@ -62,9 +62,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function SubSection({ title, children }: { title: string; children: React.ReactNode }) {
+function SubSection({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid={testId}>
       <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
       {children}
     </div>
@@ -367,8 +367,8 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         {/* SHADCN PRIMITIVES */}
         {/* ============================================================= */}
-        <Section title="Primitives (shadcn/ui)">
-          <SubSection title="Button">
+        <Section title="Primitives (shadcn/ui)" testId="section-primitives">
+          <SubSection title="Button" testId="ss-button">
             <div className="flex flex-wrap gap-2">
               <Button>Default</Button>
               <Button variant="secondary">Secondary</Button>
@@ -385,7 +385,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Badge">
+          <SubSection title="Badge" testId="ss-badge">
             <div className="flex flex-wrap gap-2">
               <Badge>Default</Badge>
               <Badge variant="secondary">Secondary</Badge>
@@ -396,7 +396,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Card">
+          <SubSection title="Card" testId="ss-card">
             <Card>
               <CardHeader>
                 <CardTitle>Card Title</CardTitle>
@@ -416,7 +416,7 @@ export function SnapshotsPage() {
             </Card>
           </SubSection>
 
-          <SubSection title="Separator">
+          <SubSection title="Separator" testId="ss-separator">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Horizontal separator</p>
               <Separator />
@@ -428,7 +428,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Skeleton">
+          <SubSection title="Skeleton" testId="ss-skeleton">
             <div className="space-y-3">
               <Skeleton className="h-4 w-48" />
               <Skeleton className="h-4 w-64" />
@@ -443,7 +443,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="ScrollArea">
+          <SubSection title="ScrollArea" testId="ss-scroll-area">
             <ScrollArea className="h-32 rounded-xl border border-border bg-card p-4">
               {Array.from({ length: 20 }, (_, i) => (
                 <p key={i} className="py-1 text-sm text-muted-foreground">
@@ -457,22 +457,22 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         {/* SHADCN FORM & DATA COMPONENTS */}
         {/* ============================================================= */}
-        <Section title="Form & Data Components (shadcn/ui)">
-          <SubSection title="Input">
+        <Section title="Form & Data Components (shadcn/ui)" testId="section-form">
+          <SubSection title="Input" testId="ss-input">
             <div className="max-w-sm space-y-2">
               <Label htmlFor="demo-input">Email</Label>
               <Input id="demo-input" type="email" placeholder="you@example.com" />
             </div>
           </SubSection>
 
-          <SubSection title="Textarea">
+          <SubSection title="Textarea" testId="ss-textarea">
             <div className="max-w-sm space-y-2">
               <Label htmlFor="demo-textarea">Description</Label>
               <Textarea id="demo-textarea" placeholder="Write something..." />
             </div>
           </SubSection>
 
-          <SubSection title="Checkbox & Switch">
+          <SubSection title="Checkbox & Switch" testId="ss-checkbox-switch">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <Checkbox id="demo-check" />
@@ -485,20 +485,20 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Slider">
+          <SubSection title="Slider" testId="ss-slider">
             <div className="max-w-sm">
               <Slider defaultValue={[40]} max={100} step={1} />
             </div>
           </SubSection>
 
-          <SubSection title="Progress">
+          <SubSection title="Progress" testId="ss-progress">
             <div className="max-w-sm space-y-2">
               <Progress value={65} />
               <p className="text-xs text-muted-foreground">65% complete</p>
             </div>
           </SubSection>
 
-          <SubSection title="Tabs">
+          <SubSection title="Tabs" testId="ss-tabs">
             <Tabs defaultValue="overview" className="max-w-md">
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -517,7 +517,7 @@ export function SnapshotsPage() {
             </Tabs>
           </SubSection>
 
-          <SubSection title="Avatar">
+          <SubSection title="Avatar" testId="ss-avatar">
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarFallback>CN</AvatarFallback>
@@ -531,7 +531,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Alert">
+          <SubSection title="Alert" testId="ss-alert">
             <div className="max-w-md space-y-3">
               <Alert>
                 <AlertTitle>Default Alert</AlertTitle>
@@ -544,7 +544,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Table">
+          <SubSection title="Table" testId="ss-table">
             <div className="max-w-lg rounded-xl border border-border">
               <Table>
                 <TableHeader>
@@ -575,14 +575,14 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="Toggle">
+          <SubSection title="Toggle" testId="ss-toggle">
             <div className="flex gap-2">
               <Toggle aria-label="Toggle bold">B</Toggle>
               <Toggle aria-label="Toggle italic" variant="outline">I</Toggle>
             </div>
           </SubSection>
 
-          <SubSection title="Tooltip">
+          <SubSection title="Tooltip" testId="ss-tooltip">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -599,8 +599,8 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         {/* CHAT UI (assistant-ui) */}
         {/* ============================================================= */}
-        <Section title="Chat UI (assistant-ui)">
-          <SubSection title="SessionPanel — Full Chat Thread">
+        <Section title="Chat UI (assistant-ui)" testId="section-chat-ui">
+          <SubSection title="SessionPanel — Full Chat Thread" testId="ss-session-panel">
             <div className="h-[500px] rounded-xl border border-border overflow-hidden">
               <SessionPanel
                 session={mockSession}
@@ -609,7 +609,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="SessionPanel — Empty State">
+          <SubSection title="SessionPanel — Empty State" testId="ss-session-panel-empty">
             <div className="h-[200px] rounded-xl border border-border overflow-hidden">
               <SessionPanel session={null} />
             </div>
@@ -619,8 +619,8 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         {/* CONCEPT COMPONENTS */}
         {/* ============================================================= */}
-        <Section title="Concept Components">
-          <SubSection title="SkillCard">
+        <Section title="Concept Components" testId="section-concepts">
+          <SubSection title="SkillCard" testId="ss-skill-card">
             <div className="grid gap-3 sm:grid-cols-2">
               <SkillCard
                 skill={mockSkill}
@@ -630,7 +630,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="TaskCard">
+          <SubSection title="TaskCard" testId="ss-task-card">
             <div className="space-y-3">
               {mockTasks.map((task) => (
                 <TaskCard
@@ -648,7 +648,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="McpBrowser">
+          <SubSection title="McpBrowser" testId="ss-mcp-browser">
             <McpBrowser
               servers={mockMcpServers}
               selectedServerId={selectedMcp}
@@ -656,14 +656,14 @@ export function SnapshotsPage() {
             />
           </SubSection>
 
-          <SubSection title="HookConfigPanel">
+          <SubSection title="HookConfigPanel" testId="ss-hook-config">
             <HookConfigPanel
               hooks={mockHooks}
               onToggle={(id, enabled) => console.log('toggle', id, enabled)}
             />
           </SubSection>
 
-          <SubSection title="WorktreeSelector">
+          <SubSection title="WorktreeSelector" testId="ss-worktree">
             <WorktreeSelector
               worktrees={mockWorktrees}
               selectedId={selectedWorktree}
@@ -671,7 +671,7 @@ export function SnapshotsPage() {
             />
           </SubSection>
 
-          <SubSection title="ResearchDocViewer">
+          <SubSection title="ResearchDocViewer" testId="ss-research-doc">
             <ResearchDocViewer doc={mockDoc} />
           </SubSection>
         </Section>
@@ -679,22 +679,22 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         {/* CHAT ELEMENTS */}
         {/* ============================================================= */}
-        <Section title="Chat Elements">
-          <SubSection title="ToolCallViewer">
+        <Section title="Chat Elements" testId="section-chat-elements">
+          <SubSection title="ToolCallViewer" testId="ss-tool-call">
             <div className="space-y-3">
               <ToolCallViewer element={mockToolCall} />
               <ToolCallViewer element={mockToolCallError} />
             </div>
           </SubSection>
 
-          <SubSection title="CodeBlock">
+          <SubSection title="CodeBlock" testId="ss-code-block">
             <CodeBlock
               element={mockCodeBlock}
               onApply={(id) => console.log('apply', id)}
             />
           </SubSection>
 
-          <SubSection title="CostTicker">
+          <SubSection title="CostTicker" testId="ss-cost-ticker">
             <div className="flex flex-wrap gap-3">
               <CostTicker element={mockCostTicker} />
               <CostTicker
@@ -709,7 +709,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="DiffView">
+          <SubSection title="DiffView" testId="ss-diff-view">
             <div className="space-y-3">
               <DiffView
                 element={mockDiff}
@@ -720,7 +720,7 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          <SubSection title="ProgressIndicator">
+          <SubSection title="ProgressIndicator" testId="ss-progress-indicator">
             <div className="space-y-3">
               {mockProgress.map((p) => (
                 <ProgressIndicator key={p.id} element={p} />
