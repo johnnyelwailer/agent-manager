@@ -48,7 +48,6 @@ import { Toggle } from '../components/ui/toggle.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip.js';
 import { SessionPanel } from '../components/layout/session-panel.js';
 import { AppShell, ShellNavbar, ShellStatusBar } from '../components/layout/app-shell.js';
-import { Sidebar } from '../components/layout/sidebar.js';
 import type { SessionInfo } from '@agent-manager/shared';
 import { cn } from '@agent-manager/ui';
 
@@ -538,6 +537,84 @@ function MockStatusBar() {
 // Mock empty main content (new session form)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Mock static chat panel for high-level screens (no assistant-ui runtime)
+// ---------------------------------------------------------------------------
+
+function MockChatPanel({ session, variant = 'completed' }: { session: SessionInfo; variant?: 'running' | 'completed' }) {
+  // Cast events to any[] for mock rendering — these are display-only snapshots
+  const events = (session.events ?? []) as Array<Record<string, any>>;
+  const thinkingText = events.find((e) => e.type === 'thinking')?.text ?? 'Analyzing the request...';
+  const assistantText = events.filter((e) => e.type === 'text_delta').map((e) => e.text).join('') || 'Working on the task...';
+  const toolCalls = events.filter((e) => e.type === 'tool_call');
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-foreground">{session.prompt}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {session.adapterId} &middot; {session.status}
+            {session.model && ` \u00b7 ${session.model}`}
+          </div>
+        </div>
+        <CostTicker element={{ type: 'cost_ticker', id: 'mock-cost', costUsd: session.costUsd, tokensIn: session.tokensIn, tokensOut: session.tokensOut }} />
+      </div>
+
+      {/* Static message thread */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Thinking block */}
+        <div className="px-4 py-3">
+          <div className="rounded-lg bg-muted/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground italic">{thinkingText}</p>
+          </div>
+        </div>
+
+        {/* Assistant text */}
+        <div className="px-4 py-2">
+          <div className="text-sm text-foreground">{assistantText}</div>
+        </div>
+
+        {/* Tool calls */}
+        {toolCalls.map((e) => (
+          <div key={e.id} className="px-4 py-1">
+            <ToolCallViewer
+              element={{
+                type: 'tool_call',
+                id: e.id,
+                toolName: e.toolName,
+                input: e.input,
+                output: events.find((r) => r.type === 'tool_result' && r.toolUseId === e.toolUseId)?.output ?? '',
+                collapsed: true,
+                isError: false,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-border bg-background px-4 py-3">
+        <div className="flex items-end gap-2">
+          <div className="min-h-[40px] flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-muted-foreground">
+            Send a message...
+          </div>
+          {variant === 'running' ? (
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-destructive text-destructive-foreground">
+              <div className="h-4 w-4 rounded-sm bg-current" />
+            </div>
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" /></svg>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MockEmptyMain() {
   return (
     <div className="flex h-full items-center justify-center p-8">
@@ -601,10 +678,7 @@ export function SnapshotsPage() {
                 }
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockRunningSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockRunningSession} variant="running" />
               </AppShell>
             </div>
           </SubSection>
@@ -624,10 +698,7 @@ export function SnapshotsPage() {
                 }
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>
@@ -668,10 +739,7 @@ export function SnapshotsPage() {
                 detail={<MockDetailContent />}
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>
@@ -691,10 +759,7 @@ export function SnapshotsPage() {
                 }
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>
@@ -715,10 +780,7 @@ export function SnapshotsPage() {
                 }
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>
@@ -759,10 +821,7 @@ export function SnapshotsPage() {
                 detail={<MockDetailContent />}
                 statusBar={<MockStatusBar />}
               >
-                <SessionPanel
-                  session={mockSession}
-                  onSendMessage={() => {}}
-                />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>

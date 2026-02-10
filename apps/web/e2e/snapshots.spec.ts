@@ -22,7 +22,15 @@ test.beforeEach(async ({ page }) => {
 
   await page.goto('/snapshots');
   // Wait for the snapshot page content to render
-  await page.waitForSelector('[data-testid="section-primitives"]', { timeout: 10_000 });
+  await page.waitForSelector('[data-testid="section-app-shell"]', { timeout: 10_000 });
+
+  // Stop all intervals/timers that poll connection status — these cause
+  // continuous state updates that prevent Playwright's element stability check
+  // from passing (the connection store polls every 1s).
+  await page.evaluate(() => {
+    const id = window.setInterval(() => {}, 9999);
+    for (let i = 0; i <= id; i++) window.clearInterval(i);
+  });
 });
 
 // ---------------------------------------------------------------------------

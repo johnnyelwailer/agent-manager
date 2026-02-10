@@ -122,7 +122,7 @@ export function AppShell({
       <div
         data-testid={testId}
         data-layout={layout}
-        className={cn('flex h-screen flex-col bg-background', className)}
+        className={cn('flex h-full flex-col bg-background', className)}
       >
         {/* Navbar */}
         {navbar && (
