@@ -1,96 +1,25 @@
-import { cn } from '@agent-manager/ui';
-import { ToolCallViewer, CostTicker, ProgressIndicator } from '@agent-manager/ui';
-import type { SessionInfo, AgentEvent } from '@agent-manager/shared';
+import { AssistantRuntimeProvider } from '@assistant-ui/react';
+import { CostTicker } from '@agent-manager/ui';
+import type { SessionInfo } from '@agent-manager/shared';
+import { cn } from '@/lib/utils';
+import { useAgentRuntime } from '@/lib/agent-runtime';
+import { AgentThread } from '@/components/chat/agent-thread';
+import {
+  ReadToolUI,
+  EditToolUI,
+  WriteToolUI,
+  BashToolUI,
+} from '@/components/chat/tool-renderers';
 
 export interface SessionPanelProps {
   session: SessionInfo | null;
   className?: string;
+  onSendMessage?: (message: string) => void;
 }
 
-function EventItem({ event }: { event: AgentEvent }) {
-  switch (event.type) {
-    case 'text_delta':
-      return <span className="text-sm text-foreground">{event.text}</span>;
+export function SessionPanel({ session, className, onSendMessage }: SessionPanelProps) {
+  const runtime = useAgentRuntime(session, onSendMessage);
 
-    case 'thinking':
-      return (
-        <div className="rounded-lg bg-muted px-3 py-2 text-xs italic text-muted-foreground">
-          {event.text}
-        </div>
-      );
-
-    case 'tool_call':
-      return (
-        <ToolCallViewer
-          element={{
-            type: 'tool_call',
-            id: event.toolUseId,
-            toolName: event.toolName,
-            input: event.input,
-            collapsed: true,
-            isError: false,
-          }}
-        />
-      );
-
-    case 'tool_result':
-      return (
-        <div className={cn(
-          'rounded-lg border px-3 py-2 text-xs font-mono',
-          event.isError
-            ? 'border-destructive/50 bg-destructive/10 text-destructive'
-            : 'border-border bg-muted text-muted-foreground',
-        )}>
-          <div className="mb-1 text-xs font-sans text-muted-foreground">{event.toolName} result</div>
-          <div className="max-h-32 overflow-auto whitespace-pre-wrap">{event.output}</div>
-        </div>
-      );
-
-    case 'error':
-      return (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          Error: {event.message}
-        </div>
-      );
-
-    case 'cost_update':
-      return (
-        <CostTicker
-          element={{
-            type: 'cost_ticker',
-            id: event.id,
-            costUsd: event.costUsd,
-            tokensIn: event.tokensIn,
-            tokensOut: event.tokensOut,
-          }}
-        />
-      );
-
-    case 'session_start':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Session started &middot; {event.model} &middot; {event.cwd}
-        </div>
-      );
-
-    case 'session_end':
-      return (
-        <div className={cn(
-          'rounded-lg px-3 py-2 text-xs',
-          event.result === 'success'
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/10 dark:text-green-300'
-            : 'bg-destructive/10 text-destructive',
-        )}>
-          Session ended: {event.result} &middot; ${event.costUsd.toFixed(4)} &middot; {(event.durationMs / 1000).toFixed(1)}s
-        </div>
-      );
-
-    default:
-      return null;
-  }
-}
-
-export function SessionPanel({ session, className }: SessionPanelProps) {
   if (!session) {
     return (
       <div className={cn('flex h-full items-center justify-center', className)}>
@@ -99,33 +28,6 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
           <p className="mt-1 text-xs text-muted-foreground">or start a new one</p>
         </div>
       </div>
-    );
-  }
-
-  // Accumulate text deltas into contiguous blocks
-  const rendered: React.ReactNode[] = [];
-  let textBuffer = '';
-
-  for (const event of session.events) {
-    if (event.type === 'text_delta') {
-      textBuffer += event.text;
-      continue;
-    }
-    if (textBuffer) {
-      rendered.push(
-        <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-foreground">
-          {textBuffer}
-        </div>,
-      );
-      textBuffer = '';
-    }
-    rendered.push(<EventItem key={event.id} event={event} />);
-  }
-  if (textBuffer) {
-    rendered.push(
-      <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-foreground">
-        {textBuffer}
-      </div>,
     );
   }
 
@@ -151,10 +53,16 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
         />
       </div>
 
-      {/* Event stream */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {rendered}
-      </div>
+      {/* Chat thread powered by assistant-ui */}
+      <AssistantRuntimeProvider runtime={runtime}>
+        {/* Tool-specific renderers */}
+        <ReadToolUI />
+        <EditToolUI />
+        <WriteToolUI />
+        <BashToolUI />
+
+        <AgentThread className="flex-1" />
+      </AssistantRuntimeProvider>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   SkillCard,
   TaskCard,
@@ -45,6 +45,8 @@ import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert.js';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table.js';
 import { Toggle } from '../components/ui/toggle.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip.js';
+import { SessionPanel } from '../components/layout/session-panel.js';
+import type { SessionInfo } from '@agent-manager/shared';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -317,6 +319,33 @@ const mockProgress: ProgressElement[] = [
   { type: 'progress', id: 'p-3', label: 'Build production', progress: 30, status: 'failed', details: 'TypeScript compilation error' },
 ];
 
+const mockSession: SessionInfo = {
+  sessionId: 'demo-session-1',
+  adapterId: 'claude-code',
+  prompt: 'Help me refactor the authentication module to use JWT tokens',
+  cwd: '/home/user/project',
+  model: 'claude-opus-4-6',
+  status: 'completed',
+  startedAt: '2026-02-10T12:00:00Z',
+  endedAt: '2026-02-10T12:05:00Z',
+  costUsd: 0.0847,
+  tokensIn: 24500,
+  tokensOut: 3200,
+  events: [
+    { id: 'e1', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:00Z', type: 'session_start', model: 'claude-opus-4-6', cwd: '/home/user/project' },
+    { id: 'e2', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:01Z', type: 'thinking', text: 'Let me analyze the current authentication implementation to understand what needs to be refactored...' },
+    { id: 'e3', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:02Z', type: 'text_delta', text: "I'll help you refactor the authentication module. Let me start by reading the current implementation." },
+    { id: 'e4', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:03Z', type: 'tool_call', toolUseId: 'tu-1', toolName: 'Read', input: { file_path: '/home/user/project/src/auth.ts' } },
+    { id: 'e5', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:04Z', type: 'tool_result', toolUseId: 'tu-1', toolName: 'Read', output: 'import session from "express-session";\n\nexport function authenticate(req, res, next) {\n  if (!req.session.user) return res.status(401).send("Unauthorized");\n  next();\n}', isError: false },
+    { id: 'e6', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:05Z', type: 'text_delta', text: '\n\nI see the current implementation uses express-session. Here\'s the JWT-based refactor:' },
+    { id: 'e7', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:06Z', type: 'tool_call', toolUseId: 'tu-2', toolName: 'Edit', input: { file_path: '/home/user/project/src/auth.ts', old_string: 'import session from "express-session";', new_string: 'import { sign, verify } from "jsonwebtoken";' } },
+    { id: 'e8', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:07Z', type: 'tool_result', toolUseId: 'tu-2', toolName: 'Edit', output: 'File updated successfully', isError: false },
+    { id: 'e9', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:08Z', type: 'text_delta', text: '\n\nDone! The authentication module has been refactored to use JWT tokens.' },
+    { id: 'e10', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:09Z', type: 'cost_update', costUsd: 0.0847, tokensIn: 24500, tokensOut: 3200 },
+    { id: 'e11', sessionId: 'demo-session-1', timestamp: '2026-02-10T12:00:10Z', type: 'session_end', result: 'success', costUsd: 0.0847, durationMs: 10000, tokensIn: 24500, tokensOut: 3200 },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Snapshot page component
 // ---------------------------------------------------------------------------
@@ -564,6 +593,26 @@ export function SnapshotsPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          </SubSection>
+        </Section>
+
+        {/* ============================================================= */}
+        {/* CHAT UI (assistant-ui) */}
+        {/* ============================================================= */}
+        <Section title="Chat UI (assistant-ui)">
+          <SubSection title="SessionPanel — Full Chat Thread">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <SessionPanel
+                session={mockSession}
+                onSendMessage={(msg) => console.log('send:', msg)}
+              />
+            </div>
+          </SubSection>
+
+          <SubSection title="SessionPanel — Empty State">
+            <div className="h-[200px] rounded-xl border border-border overflow-hidden">
+              <SessionPanel session={null} />
+            </div>
           </SubSection>
         </Section>
 
