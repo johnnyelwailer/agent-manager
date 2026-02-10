@@ -32,6 +32,19 @@ import { Badge } from '../components/ui/badge.js';
 import { Separator } from '../components/ui/separator.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { ScrollArea } from '../components/ui/scroll-area.js';
+import { Input } from '../components/ui/input.js';
+import { Textarea } from '../components/ui/textarea.js';
+import { Label } from '../components/ui/label.js';
+import { Switch } from '../components/ui/switch.js';
+import { Checkbox } from '../components/ui/checkbox.js';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js';
+import { Progress } from '../components/ui/progress.js';
+import { Slider } from '../components/ui/slider.js';
+import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar.js';
+import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert.js';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table.js';
+import { Toggle } from '../components/ui/toggle.js';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip.js';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -349,9 +362,8 @@ export function SnapshotsPage() {
               <Badge variant="secondary">Secondary</Badge>
               <Badge variant="destructive">Destructive</Badge>
               <Badge variant="outline">Outline</Badge>
-              <Badge variant="success">Success</Badge>
-              <Badge variant="warning">Warning</Badge>
-              <Badge variant="info">Info</Badge>
+              <Badge variant="ghost">Ghost</Badge>
+              <Badge variant="link">Link</Badge>
             </div>
           </SubSection>
 
@@ -410,6 +422,148 @@ export function SnapshotsPage() {
                 </p>
               ))}
             </ScrollArea>
+          </SubSection>
+        </Section>
+
+        {/* ============================================================= */}
+        {/* SHADCN FORM & DATA COMPONENTS */}
+        {/* ============================================================= */}
+        <Section title="Form & Data Components (shadcn/ui)">
+          <SubSection title="Input">
+            <div className="max-w-sm space-y-2">
+              <Label htmlFor="demo-input">Email</Label>
+              <Input id="demo-input" type="email" placeholder="you@example.com" />
+            </div>
+          </SubSection>
+
+          <SubSection title="Textarea">
+            <div className="max-w-sm space-y-2">
+              <Label htmlFor="demo-textarea">Description</Label>
+              <Textarea id="demo-textarea" placeholder="Write something..." />
+            </div>
+          </SubSection>
+
+          <SubSection title="Checkbox & Switch">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Checkbox id="demo-check" />
+                <Label htmlFor="demo-check">Accept terms</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="demo-switch" />
+                <Label htmlFor="demo-switch">Notifications</Label>
+              </div>
+            </div>
+          </SubSection>
+
+          <SubSection title="Slider">
+            <div className="max-w-sm">
+              <Slider defaultValue={[40]} max={100} step={1} />
+            </div>
+          </SubSection>
+
+          <SubSection title="Progress">
+            <div className="max-w-sm space-y-2">
+              <Progress value={65} />
+              <p className="text-xs text-muted-foreground">65% complete</p>
+            </div>
+          </SubSection>
+
+          <SubSection title="Tabs">
+            <Tabs defaultValue="overview" className="max-w-md">
+              <TabsList>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                <TabsTrigger value="reports">Reports</TabsTrigger>
+              </TabsList>
+              <TabsContent value="overview" className="rounded-lg border border-border p-4">
+                <p className="text-sm text-muted-foreground">Overview content with key metrics.</p>
+              </TabsContent>
+              <TabsContent value="analytics" className="rounded-lg border border-border p-4">
+                <p className="text-sm text-muted-foreground">Analytics dashboard and charts.</p>
+              </TabsContent>
+              <TabsContent value="reports" className="rounded-lg border border-border p-4">
+                <p className="text-sm text-muted-foreground">Generated reports and exports.</p>
+              </TabsContent>
+            </Tabs>
+          </SubSection>
+
+          <SubSection title="Avatar">
+            <div className="flex items-center gap-3">
+              <Avatar>
+                <AvatarFallback>CN</AvatarFallback>
+              </Avatar>
+              <Avatar>
+                <AvatarFallback>JD</AvatarFallback>
+              </Avatar>
+              <Avatar>
+                <AvatarFallback>AM</AvatarFallback>
+              </Avatar>
+            </div>
+          </SubSection>
+
+          <SubSection title="Alert">
+            <div className="max-w-md space-y-3">
+              <Alert>
+                <AlertTitle>Default Alert</AlertTitle>
+                <AlertDescription>This is a default informational alert.</AlertDescription>
+              </Alert>
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>Something went wrong during the build process.</AlertDescription>
+              </Alert>
+            </div>
+          </SubSection>
+
+          <SubSection title="Table">
+            <div className="max-w-lg rounded-xl border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">session-001</TableCell>
+                    <TableCell><Badge variant="secondary">running</Badge></TableCell>
+                    <TableCell className="text-right">$0.0245</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">session-002</TableCell>
+                    <TableCell><Badge variant="outline">completed</Badge></TableCell>
+                    <TableCell className="text-right">$0.1832</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">session-003</TableCell>
+                    <TableCell><Badge variant="destructive">failed</Badge></TableCell>
+                    <TableCell className="text-right">$0.0047</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </SubSection>
+
+          <SubSection title="Toggle">
+            <div className="flex gap-2">
+              <Toggle aria-label="Toggle bold">B</Toggle>
+              <Toggle aria-label="Toggle italic" variant="outline">I</Toggle>
+            </div>
+          </SubSection>
+
+          <SubSection title="Tooltip">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline">Hover me</Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>This is a tooltip</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </SubSection>
         </Section>
 
