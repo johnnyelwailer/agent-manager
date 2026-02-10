@@ -34,6 +34,58 @@ test('full page', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
+// App Shell — High-Level Screens
+// ---------------------------------------------------------------------------
+
+test('app-shell-running', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-running"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-running.png', ssOpts);
+});
+
+test('app-shell-completed', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-completed"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-completed.png', ssOpts);
+});
+
+test('app-shell-empty', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-empty"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-empty.png', ssOpts);
+});
+
+test('app-shell-three-panel', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-three-panel"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-three-panel.png', ssOpts);
+});
+
+test('app-shell-focused', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-focused"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-focused.png', ssOpts);
+});
+
+test('app-shell-collapsed', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-collapsed"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-collapsed.png', ssOpts);
+});
+
+test('app-shell-no-sessions', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-no-sessions"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-no-sessions.png', ssOpts);
+});
+
+test('app-shell-detail-collapsed', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-detail-collapsed"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-detail-collapsed.png', ssOpts);
+});
+
+// ---------------------------------------------------------------------------
 // Primitives (shadcn/ui)
 // ---------------------------------------------------------------------------
 

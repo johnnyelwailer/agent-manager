@@ -4,13 +4,14 @@ import { useConnectionStore } from './stores/connection.js';
 import { useSessionsStore } from './stores/sessions.js';
 import { useAdaptersStore } from './stores/adapters.js';
 import { cn } from '@agent-manager/ui';
+import { AppShell, ShellNavbar, ShellStatusBar } from './components/layout/app-shell.js';
 import { Sidebar } from './components/layout/sidebar.js';
 import { SessionPanel } from './components/layout/session-panel.js';
 import { NewSessionForm } from './components/layout/new-session-form.js';
 import { SnapshotsPage } from './pages/snapshots.js';
 
 // ---------------------------------------------------------------------------
-// Root layout
+// Root layout — uses AppShell for the outer chrome
 // ---------------------------------------------------------------------------
 
 const rootRoute = createRootRoute({
@@ -40,23 +41,27 @@ const rootRoute = createRootRoute({
 
     return (
       <div className="flex h-screen flex-col bg-background">
-        <nav className="flex items-center justify-between border-b border-border px-4 py-2">
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-semibold text-foreground">Agent Manager</span>
-            <div className={cn('ml-2 h-2 w-2 rounded-full', connected ? 'bg-green-500' : 'bg-red-500')} />
-          </div>
-          <div className="flex items-center gap-1">
-            {navItems.map(({ to, label }) => (
-              <Link
-                key={to}
-                to={to}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&.active]:bg-accent [&.active]:text-accent-foreground"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+        <ShellNavbar
+          leading={
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-semibold text-foreground">Agent Manager</span>
+              <div className={cn('ml-2 h-2 w-2 rounded-full', connected ? 'bg-green-500' : 'bg-red-500')} />
+            </div>
+          }
+          trailing={
+            <div className="flex items-center gap-1">
+              {navItems.map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&.active]:bg-accent [&.active]:text-accent-foreground"
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+          }
+        />
         <main className="flex-1 overflow-hidden">
           <Outlet />
         </main>

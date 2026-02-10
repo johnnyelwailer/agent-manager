@@ -25,6 +25,7 @@ import type {
   CostTickerElement,
   DiffViewElement,
   ProgressElement,
+  SessionSummary,
 } from '@agent-manager/shared';
 import { Button } from '../components/ui/button.js';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from '../components/ui/card.js';
@@ -46,7 +47,10 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Toggle } from '../components/ui/toggle.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip.js';
 import { SessionPanel } from '../components/layout/session-panel.js';
+import { AppShell, ShellNavbar, ShellStatusBar } from '../components/layout/app-shell.js';
+import { Sidebar } from '../components/layout/sidebar.js';
 import type { SessionInfo } from '@agent-manager/shared';
+import { cn } from '@agent-manager/ui';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -346,6 +350,219 @@ const mockSession: SessionInfo = {
   ],
 };
 
+// Running session variant
+const mockRunningSession: SessionInfo = {
+  sessionId: 'demo-session-running',
+  adapterId: 'claude-code',
+  prompt: 'Add unit tests for the payment processing module',
+  cwd: '/home/user/project',
+  model: 'claude-opus-4-6',
+  status: 'running',
+  startedAt: '2026-02-10T14:00:00Z',
+  costUsd: 0.0312,
+  tokensIn: 8500,
+  tokensOut: 1200,
+  events: [
+    { id: 'r1', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:00Z', type: 'session_start', model: 'claude-opus-4-6', cwd: '/home/user/project' },
+    { id: 'r2', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:01Z', type: 'thinking', text: 'I need to examine the payment processing module to understand what tests to write...' },
+    { id: 'r3', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:02Z', type: 'text_delta', text: "I'll write comprehensive unit tests for the payment module. Let me first look at the existing code." },
+    { id: 'r4', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:03Z', type: 'tool_call', toolUseId: 'tu-r1', toolName: 'Read', input: { file_path: '/home/user/project/src/payments.ts' } },
+    { id: 'r5', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:04Z', type: 'tool_result', toolUseId: 'tu-r1', toolName: 'Read', output: 'export async function processPayment(amount: number, currency: string) {\n  const result = await stripe.charges.create({ amount, currency });\n  return { id: result.id, status: result.status };\n}', isError: false },
+    { id: 'r6', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:05Z', type: 'text_delta', text: '\n\nI can see the payment module uses Stripe. Let me write tests covering success and failure scenarios:' },
+  ],
+};
+
+// Session summaries for sidebar list
+const mockSessionSummaries: SessionSummary[] = [
+  { sessionId: 'demo-session-running', adapterId: 'claude-code', prompt: 'Add unit tests for the payment processing module', status: 'running', startedAt: '2026-02-10T14:00:00Z', costUsd: 0.0312, eventCount: 6, cwd: '/home/user/project', tokensIn: 8500, tokensOut: 1200 },
+  { sessionId: 'demo-session-1', adapterId: 'claude-code', prompt: 'Help me refactor the authentication module to use JWT tokens', status: 'completed', startedAt: '2026-02-10T12:00:00Z', endedAt: '2026-02-10T12:05:00Z', costUsd: 0.0847, eventCount: 11, cwd: '/home/user/project', tokensIn: 24500, tokensOut: 3200 },
+  { sessionId: 'demo-session-3', adapterId: 'claude-code', prompt: 'Fix the database connection pool leak', status: 'failed', startedAt: '2026-02-10T10:30:00Z', endedAt: '2026-02-10T10:31:00Z', costUsd: 0.0023, eventCount: 4, cwd: '/home/user/project', tokensIn: 1200, tokensOut: 300 },
+  { sessionId: 'demo-session-4', adapterId: 'claude-code', prompt: 'Set up CI/CD pipeline with GitHub Actions', status: 'completed', startedAt: '2026-02-09T16:00:00Z', endedAt: '2026-02-09T16:20:00Z', costUsd: 0.2145, eventCount: 38, cwd: '/home/user/project', tokensIn: 62000, tokensOut: 8400 },
+  { sessionId: 'demo-session-5', adapterId: 'aider', prompt: 'Migrate from Express to Hono framework', status: 'starting', startedAt: '2026-02-10T14:05:00Z', costUsd: 0, eventCount: 0, cwd: '/home/user/project', tokensIn: 0, tokensOut: 0 },
+];
+
+// ---------------------------------------------------------------------------
+// Mock inline sidebar for high-level screens (avoids store dependencies)
+// ---------------------------------------------------------------------------
+
+function MockSidebarContent({
+  sessions,
+  activeSessionId,
+  onSelectSession,
+}: {
+  sessions: SessionSummary[];
+  activeSessionId: string | null;
+  onSelectSession: (id: string) => void;
+}) {
+  const statusColors: Record<string, string> = {
+    starting: 'bg-amber-500',
+    running: 'bg-blue-500 animate-pulse',
+    completed: 'bg-green-500',
+    failed: 'bg-red-500',
+    interrupted: 'bg-muted-foreground',
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <h1 className="text-sm font-semibold text-foreground">Agent Manager</h1>
+        <div className="h-2 w-2 rounded-full bg-green-500" title="Connected" />
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-3 py-2">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sessions</h2>
+        </div>
+        <div className="space-y-0.5 px-2">
+          {sessions.map((session) => (
+            <button
+              key={session.sessionId}
+              onClick={() => onSelectSession(session.sessionId)}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors',
+                session.sessionId === activeSessionId
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', statusColors[session.status] ?? 'bg-muted-foreground')} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium">{session.prompt}</div>
+                <div className="text-xs text-muted-foreground">${session.costUsd.toFixed(4)}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mock detail panel content for 3-panel layout
+// ---------------------------------------------------------------------------
+
+function MockDetailContent() {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">Session Details</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</h3>
+          <div className="mt-2 space-y-2">
+            {mockTasks.slice(0, 2).map((task) => (
+              <TaskCard key={task.id} task={task} compact />
+            ))}
+          </div>
+        </div>
+        <Separator />
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cost</h3>
+          <div className="mt-2">
+            <CostTicker element={{ type: 'cost_ticker', id: 'detail-cost', costUsd: 0.0847, tokensIn: 24500, tokensOut: 3200 }} />
+          </div>
+        </div>
+        <Separator />
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">MCP Servers</h3>
+          <div className="mt-2 space-y-1">
+            {mockMcpServers.map((s) => (
+              <div key={s.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className={cn('h-1.5 w-1.5 rounded-full', s.status === 'connected' ? 'bg-green-500' : s.status === 'error' ? 'bg-red-500' : 'bg-amber-500')} />
+                <span>{s.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mock navbar for high-level screen snapshots
+// ---------------------------------------------------------------------------
+
+function MockNavbar({ layoutLabel }: { layoutLabel?: string }) {
+  const navItems = ['Ops', 'Sessions', 'Settings'];
+  return (
+    <ShellNavbar
+      leading={
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-foreground">Agent Manager</span>
+          <div className="ml-2 h-2 w-2 rounded-full bg-green-500" />
+          {layoutLabel && (
+            <Badge variant="outline" className="ml-2 text-[10px]">{layoutLabel}</Badge>
+          )}
+        </div>
+      }
+      trailing={
+        <div className="flex items-center gap-1">
+          {navItems.map((label) => (
+            <span
+              key={label}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors',
+                label === 'Ops' && 'bg-accent text-accent-foreground',
+              )}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      }
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mock status bar for high-level screens
+// ---------------------------------------------------------------------------
+
+function MockStatusBar() {
+  return (
+    <ShellStatusBar>
+      <span>2 agents connected</span>
+      <span className="text-border">|</span>
+      <span>5 sessions</span>
+      <span className="text-border">|</span>
+      <span>3 MCP servers</span>
+      <span className="flex-1" />
+      <span>v0.1.0</span>
+    </ShellStatusBar>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mock empty main content (new session form)
+// ---------------------------------------------------------------------------
+
+function MockEmptyMain() {
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="w-full max-w-md">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">New Session</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground">Agent</label>
+            <div className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground">claude-code</div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground">Working Directory</label>
+            <div className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-muted-foreground">/path/to/project</div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground">Prompt</label>
+            <div className="mt-1 h-20 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-muted-foreground">Describe the task...</div>
+          </div>
+          <div className="w-full rounded-md bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground">Start Session</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot page component
 // ---------------------------------------------------------------------------
@@ -363,6 +580,193 @@ export function SnapshotsPage() {
             Visual showcase of every component with sample data
           </p>
         </div>
+
+        {/* ============================================================= */}
+        {/* HIGH-LEVEL SCREENS — Full app shell layouts                   */}
+        {/* ============================================================= */}
+        <Section title="App Shell — High-Level Screens" testId="section-app-shell">
+
+          {/* ---- 1. Sidebar + Chat (Running Session) ---- */}
+          <SubSection title="Sidebar + Chat — Running Session" testId="ss-shell-running">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar layoutLabel="sidebar-main" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-running"
+                    onSelectSession={() => {}}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockRunningSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 2. Sidebar + Chat (Completed Session) ---- */}
+          <SubSection title="Sidebar + Chat — Completed Session" testId="ss-shell-completed">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar layoutLabel="sidebar-main" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-1"
+                    onSelectSession={() => {}}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 3. Empty State (No Session Selected) ---- */}
+          <SubSection title="Sidebar + Empty State — No Session" testId="ss-shell-empty">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar layoutLabel="sidebar-main" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId={null}
+                    onSelectSession={() => {}}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockEmptyMain />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 4. 3-Panel: Sidebar + Chat + Detail ---- */}
+          <SubSection title="3-Panel — Sidebar + Chat + Detail" testId="ss-shell-three-panel">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main-detail"
+                navbar={<MockNavbar layoutLabel="sidebar-main-detail" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-1"
+                    onSelectSession={() => {}}
+                  />
+                }
+                detail={<MockDetailContent />}
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 5. Focused Mode (No Sidebar) ---- */}
+          <SubSection title="Focused Mode — Chat Only" testId="ss-shell-focused">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="focused"
+                navbar={<MockNavbar layoutLabel="focused" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-1"
+                    onSelectSession={() => {}}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 6. Sidebar Collapsed ---- */}
+          <SubSection title="Sidebar Collapsed" testId="ss-shell-collapsed">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                defaultSidebarCollapsed={true}
+                navbar={<MockNavbar layoutLabel="collapsed sidebar" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-1"
+                    onSelectSession={() => {}}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 7. Empty Sessions (First-Time User) ---- */}
+          <SubSection title="Empty State — No Sessions At All" testId="ss-shell-no-sessions">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={[]}
+                    activeSessionId={null}
+                    onSelectSession={() => {}}
+                  />
+                }
+              >
+                <MockEmptyMain />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 8. 3-Panel with Detail Collapsed ---- */}
+          <SubSection title="3-Panel — Detail Collapsed" testId="ss-shell-detail-collapsed">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main-detail"
+                defaultDetailCollapsed={true}
+                navbar={<MockNavbar layoutLabel="detail collapsed" />}
+                sidebar={
+                  <MockSidebarContent
+                    sessions={mockSessionSummaries}
+                    activeSessionId="demo-session-1"
+                    onSelectSession={() => {}}
+                  />
+                }
+                detail={<MockDetailContent />}
+                statusBar={<MockStatusBar />}
+              >
+                <SessionPanel
+                  session={mockSession}
+                  onSendMessage={() => {}}
+                />
+              </AppShell>
+            </div>
+          </SubSection>
+        </Section>
 
         {/* ============================================================= */}
         {/* SHADCN PRIMITIVES */}
