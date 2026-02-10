@@ -350,6 +350,219 @@ Implementation approach:
 - **Progressive disclosure** — mobile shows summary; expand for detail
 - **Same React app** — no separate mobile app. One codebase, responsive CSS.
 
+## Protocol Stack
+
+Three complementary protocols form the interoperability backbone. Each operates at a different layer.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  UI Layer                                                │
+│  AG-UI events → React components (assistant-ui / custom) │
+└─────────────────────────┬────────────────────────────────┘
+                          │ 16 typed streaming events
+┌─────────────────────────▼────────────────────────────────┐
+│  AG-UI Protocol (@ag-ui/core)                            │
+│  Agent ↔ Frontend communication                          │
+│  text_delta, tool_call_start/args/result, state_snapshot │
+│  state_delta, run_start/end, messages, custom            │
+└─────────────────────────┬────────────────────────────────┘
+                          │
+         ┌────────────────┼────────────────┐
+         ▼                ▼                ▼
+┌─────────────┐  ┌──────────────┐  ┌─────────────────┐
+│ MCP         │  │ A2A          │  │ Agent Adapter    │
+│ Agent↔Tool  │  │ Agent↔Agent  │  │ (CLI wrapper)    │
+│ Tools,      │  │ Agent Cards, │  │ spawn → parse →  │
+│ Resources,  │  │ Tasks, SSE   │  │ normalize events │
+│ Prompts     │  │ JSON-RPC 2.0 │  │                  │
+└─────────────┘  └──────────────┘  └─────────────────┘
+```
+
+### MCP — Model Context Protocol
+
+The canonical way to define tools, resources, and prompts that any agent can consume.
+
+| Detail | Value |
+|--------|-------|
+| npm | `@modelcontextprotocol/sdk` v1.26.0 |
+| Stars | ~11.6k |
+| License | Apache 2.0 / MIT |
+| Spec version | 2025-11-25 |
+| Peer deps | `zod` (v3.25+ or v4) |
+
+**What we use it for:**
+- `McpContract` schema derived from MCP's tool/resource/prompt definitions
+- MCP client in adapters to discover tools from connected MCP servers
+- `@modelcontextprotocol/hono` for Hono integration on our backend
+- MCP UI extensions (`@mcp-ui/client`, `@mcp-ui/server`) for rendering interactive tool results inline
+
+### A2A — Agent-to-Agent Protocol (Google)
+
+Discovery and communication between agents from different providers/frameworks.
+
+| Detail | Value |
+|--------|-------|
+| npm | `@a2a-js/sdk` |
+| License | Apache 2.0 |
+| Spec version | v0.3 (July 2025) |
+| Governance | Linux Foundation |
+| Supporters | 150+ orgs (Atlassian, Salesforce, Microsoft, LangChain) |
+
+**What we use it for:**
+- **Agent Cards** (`/.well-known/agent.json`) for dynamic adapter discovery — agents register their name, endpoint, skills, auth, and capabilities
+- **Task lifecycle states** (submitted, working, input-required, completed, canceled, failed) as a standard vocabulary for `TaskContract.status`
+- **A2UI** for agents that generate UI layouts as messages (renderable by our framework)
+- Future: cross-agent workflow orchestration (Phase 6)
+
+### AG-UI — Agent-to-Frontend Protocol (CopilotKit)
+
+The emerging standard for agent-to-frontend streaming communication. 16 typed event types.
+
+| Detail | Value |
+|--------|-------|
+| npm | `@ag-ui/core` v0.0.44, `@ag-ui/client`, `@ag-ui/proto` |
+| License | MIT |
+| Adopters | Google, LangChain, AWS, Microsoft, Mastra, PydanticAI |
+
+**What we use it for:**
+- **Wire format** for agent→UI streaming: text deltas, tool calls (start/args/result), state snapshots/deltas, run lifecycle, custom events
+- `@ag-ui/client` (`HttpAgent`, `AbstractAgent`) as base class for adapters that speak AG-UI natively
+- `@ag-ui/langgraph` for LangGraph agent integration
+- `@ag-ui/proto` for Protocol Buffers binary serialization (high-throughput scenarios)
+- Map our `AgentEvent` types to AG-UI's 16 event types for interop
+
+### Protocol Relationship
+
+| Layer | Protocol | Purpose |
+|-------|----------|---------|
+| Agent ↔ Tool | **MCP** | Define and invoke tools, resources, prompts |
+| Agent ↔ Agent | **A2A** | Cross-agent discovery, delegation, communication |
+| Agent ↔ Frontend | **AG-UI** | Real-time streaming events for UI rendering |
+| Agent ↔ Our Backend | **Adapter** | CLI wrapper (spawn → parse → normalize to AG-UI events) |
+
+Our adapters normalize any agent's output into AG-UI events. The UI binds to AG-UI events. MCP defines the tool/resource layer. A2A enables multi-agent discovery. All three are open protocols under active governance.
+
+## Library Selections
+
+Research-validated selections, all confirmed React 19 + Tailwind 4 compatible.
+
+### AI Chat & Agent UI
+
+| Library | npm | Stars | License | Role |
+|---------|-----|-------|---------|------|
+| **assistant-ui** | `@assistant-ui/react` v0.12.9 | 8.4k | MIT | Composable chat primitives (Thread, Message, Composer, Tool Call rendering). Radix-style API. shadcn/ui theme. Vercel AI SDK + MCP integrations. |
+| **CopilotKit** | `@copilotkit/react-core` v1.51.3 | 28.6k | MIT | Reference for AG-UI protocol integration, `useAgent` hook pattern, shared state model. We adopt the protocol, not the full framework. |
+| **Vercel AI SDK** | `ai` v6, `@ai-sdk/react` | 21.6k | Apache 2.0 | `useChat` hooks for streaming state management, provider abstraction, `UIMessage` with `parts` type system. |
+
+**Decision:** Use **assistant-ui** as the chat component foundation (composable primitives, shadcn-compatible). Adopt **AG-UI protocol** from CopilotKit as our event wire format. Use **Vercel AI SDK** patterns for streaming hooks and message types.
+
+### Code & Developer Tools
+
+| Library | npm | Version | Stars | React 19 | Role |
+|---------|-----|---------|-------|----------|------|
+| **Monaco Editor** | `@monaco-editor/react` | 4.7.0 | ~4k | Yes | Primary code editor (full IDE features, diff editor, IntelliSense) |
+| **CodeMirror 6** | `@uiw/react-codemirror` | 4.25.4 | ~2.1k | Yes | Lightweight inline editor (config panels, quick-edit, ~50KB vs Monaco's ~2MB) |
+| **Shiki** | `shiki` + `react-shiki` | 3.22.0 | ~12.9k | Yes | Syntax highlighting (VS Code engine, 200+ languages, streaming-friendly) |
+| **xterm.js** | `@xterm/xterm` | 6.0.0 | ~20k | Yes (agnostic) | Terminal emulation for agent command execution display |
+| **Diff Viewer** | `@alexbruf/react-diff-viewer` | latest | — | Yes | Split/unified diff views for agent-proposed file changes |
+| **File Tree** | `react-complex-tree` | 2.6.1 | ~1k | Yes | Worktree/file browser with DnD, keyboard nav, unopinionated rendering |
+
+### Interaction & Layout
+
+| Library | npm | Version | Stars | React 19 | Role |
+|---------|-----|---------|-------|----------|------|
+| **Command Palette** | `cmdk` | 1.1.1 | ~12.2k | Partial* | Command palette (used by shadcn/ui's `<Command>`) |
+| **React Flow** | `@xyflow/react` | 12.10.0 | ~35k | Yes | Workflow graph visualization, pipeline DAGs, tool-call dependency views |
+| **Drag & Drop** | `@atlaskit/pragmatic-drag-and-drop` | 1.7.7 | — | Yes | Kanban boards, sortable lists (~4.7KB, framework-agnostic core) |
+| **Gantt/Timeline** | `@svar-ui/react-gantt` | 2.5.2 | — | Yes | Pipeline/verification stage timelines |
+| **Markdown** | `react-markdown` + `remark-gfm` + `rehype-pretty-code` | 10.1.0 | ~15.4k | Yes | Research doc rendering, agent output formatting |
+
+*cmdk: use `--legacy-peer-deps` or pnpm override for React 19. shadcn PR #6644 patches this.
+
+### Remote Access
+
+| Library | npm | Version | Role |
+|---------|-----|---------|------|
+| **Cloudflare Tunnel** | `cloudflared` | 0.7.1 | Production tunneling (programmatic API, auto-installs binary, TLS-terminated) |
+| **bore** | (Rust binary) | 0.6.0 | Self-hosted alternative (~400 lines Rust, MIT, spawn as Tauri sidecar) |
+
+**Avoid:** `localtunnel` (abandoned), `@tailscale/connect` (stale WASM experiment), `kbar` (blocked on React 19).
+
+### Desktop
+
+| Library | npm | Version | Stars | Role |
+|---------|-----|---------|-------|------|
+| **Tauri** | `@tauri-apps/api` + `@tauri-apps/cli` | 2.10.1 | ~100k | Desktop shell, IPC, native plugins (fs, shell, dialog, SQL, updater, deep-link) |
+
+Tauri 2.x key improvements: Channel API for Rust→JS streaming, Raw Request for binary/protobuf, ACL-based security per-window, Swift/Kotlin mobile bindings. Plugin ecosystem covers everything we need (fs, shell, dialog, clipboard, HTTP, WebSocket, updater, deep-link, SQL, store).
+
+## Cross-Platform Concept Mapping
+
+Research across 12+ agent platforms reveals convergent patterns. Our contract system must support these universal abstractions.
+
+### Universal Patterns (found in 3+ platforms)
+
+| Pattern | Platforms | Our Contract |
+|---------|-----------|-------------|
+| Plan-first workflow | Copilot Workspace, Cursor, Devin, Jules, Amazon Q | `ResearchDocContract` (role: `plan`) + `TaskContract` |
+| Self-correction loop | Copilot, Cursor, Windsurf, Devin, Codex | `HookContract` (post-tool verification) |
+| Editable plans | Copilot Workspace, Cursor, Devin, Jules | `ResearchDocContract` with edit affordance |
+| Slash commands | Claude, Cursor, Amazon Q, Continue, Aider | `CommandContract` |
+| Rules/instruction files | Claude (CLAUDE.md), Copilot (AGENTS.md), Cursor (.cursor/rules) | `ResearchDocContract` (role: `rules`) |
+| Background/async agents | Cursor, Devin, Jules, Copilot | `TaskContract` + `SessionContract` with async status |
+| MCP integration | Claude, Cursor, Codex, Continue, Windsurf, OpenHands | `McpContract` |
+| Streaming structured output | Claude (stream-json), Codex (NDJSON), OpenHands (events) | AG-UI event stream |
+| Multi-model routing | Aider (architect/editor), Cursor (plan/build), Continue (chat/edit) | `WorkflowPhase` with model config |
+| Parallel agent execution | Claude, Cursor (8 agents), Devin, Jules (15-60) | Multi-session + `WorktreeContract` |
+| Hooks/lifecycle events | Claude, Cursor, Codex | `HookContract` |
+| Context providers | Continue (@mentions), Aider (repo map), Windsurf (RAG) | `McpContract` (resources) |
+| Auto-activating knowledge | Claude (Skills), Copilot (Agent Skills) | `SkillContract` (autoDiscoverable: true) |
+
+### Innovative Patterns to Adopt
+
+| Pattern | Source | Priority | Implementation |
+|---------|--------|----------|----------------|
+| **Timeline scrub + checkpoint restore** | Devin | High | Event-sourced session log with scrub UI (replay any point, restore state) |
+| **Agent sidebar with context pills** | Cursor | High | Visual indicators showing what files/context each agent is using |
+| **Architect/editor model split** | Aider | Medium | `WorkflowPhase` supports different model configs per phase |
+| **Typed activity events** | Jules API | High | Already covered by AG-UI event types (`planGenerated`, `progressUpdated`, etc.) |
+| **Event-sourcing with replay** | OpenHands | High | Immutable event log as foundation — enables debugging, replay, time-travel |
+| **Work log with quality grades** | Devin | Medium | `TaskContract` extended with `grade: 'A' \| 'B' \| 'C'` per step |
+| **Session sleep/wake** | Devin | Low | Session hibernation for long-lived agent contexts |
+| **Select element in preview** | Lovable | Low | Click UI elements to reference them in agent chat (future: preview mode) |
+| **ACI design** | SWE-Agent | Medium | Custom agent-computer interface > raw shell (influences tool contract design) |
+| **Skills as auto-activating knowledge** | Claude Code | High | `SkillContract` with LLM-driven activation (not just explicit invocation) |
+
+### Agent Output Normalization
+
+Every agent's output must normalize to AG-UI events. Here's how existing formats map:
+
+| Agent Format | Our Normalization |
+|-------------|-------------------|
+| Claude Code `stream-json` (system/assistant/user/result) | `system.init` → `RunStartEvent`, `assistant.text` → `TextDeltaEvent`, `assistant.tool_use` → `ToolCallStartEvent`+`ToolCallArgsEvent`, `user.tool_result` → `ToolCallResultEvent`, `result` → `RunEndEvent` |
+| OpenAI Codex NDJSON | Same pattern — map content blocks to AG-UI events |
+| OpenHands event stream (immutable events) | Direct mapping: Action → `ToolCallStartEvent`, Observation → `ToolCallResultEvent` |
+| Jules activity events | `planGenerated` → `StateDeltaEvent`, `progressUpdated` → `StateDeltaEvent`, `sessionCompleted` → `RunEndEvent` |
+| A2A task updates (SSE) | `working` → `RunStartEvent`, `input-required` → `CustomEvent`, `completed` → `RunEndEvent` |
+| Anthropic SDK raw stream | `content_block_start(text)` → `TextDeltaEvent`, `content_block_start(tool_use)` → `ToolCallStartEvent`, `content_block_delta` → `TextDeltaEvent`/`ToolCallArgsEvent` |
+
+### Claude Code Concept Mapping
+
+Claude Code CLI is our primary adapter. Its concepts map to our contracts:
+
+| Claude Code Concept | Our Contract | Notes |
+|-------------------|-------------|-------|
+| Slash commands (`/commit`, `/review-pr`) | `CommandContract` | Auto-discoverable via CLI introspection |
+| Skills (auto-activating knowledge packages) | `SkillContract` | `autoDiscoverable: true`, `source: 'autodiscovered'` |
+| Hooks (`SessionStart`, `PreToolUse`, etc.) | `HookContract` | Map hook events to contract events |
+| MCP servers + tools | `McpContract` | Direct MCP SDK integration |
+| Subagents (`.claude/agents/`) | Nested `SessionContract` | Agent-within-agent, own context |
+| Worktrees | `WorktreeContract` | Git worktree isolation for parallel work |
+| Todos (`TodoWrite`) | `TaskContract` | Map todo items to task subtasks |
+| Plugins (bundles of commands/hooks/skills) | `WorkflowPlugin` or adapter extension | Distributable configuration bundles |
+| CLAUDE.md | `ResearchDocContract` (role: `rules`) | Project-level agent instructions |
+| `--output-format stream-json` | AG-UI event stream | NDJSON → AG-UI normalization in adapter |
+
 ## Tech Stack
 
 Priorities: **typesafety** and **testability** above all else.
@@ -375,10 +588,19 @@ Priorities: **typesafety** and **testability** above all else.
 | **shadcn/ui** | Copy-paste components we own, built on Radix, TW4 + React 19 ready |
 | **TanStack Router** | File-based routing with full type safety (params, search, loaders all typed) |
 | **Zustand** | Minimal, no boilerplate, works with React 19, easy to test (plain functions) |
+| **assistant-ui** | Composable chat primitives (Thread, Message, Composer). Radix-style API, shadcn theme, Vercel AI SDK integration |
+| **Vercel AI SDK** | `useChat`/`useCompletion` hooks, streaming state management, provider abstraction |
+| **cmdk** | Command palette (via shadcn `<Command>`), fuzzy search, keyboard nav |
+| **React Flow** | Workflow graph visualization, pipeline DAGs (`@xyflow/react`) |
+| **Monaco Editor** | Full code editor with diff support (`@monaco-editor/react`) |
+| **xterm.js** | Terminal emulation for agent command display (`@xterm/xterm`) |
+| **Shiki** | Syntax highlighting (VS Code engine, streaming-friendly, `react-shiki`) |
 
 **Why TanStack Router over React Router:** Type-safe route params, search params, and loaders. Every `useParams()`, `useSearch()`, `Link to=` is validated at compile time.
 
 **Why Zustand over context:** Zustand stores are plain JS objects testable without React. No provider wrapping. Selectors prevent unnecessary re-renders. Works with React 19.
+
+**Why assistant-ui over CopilotKit:** CopilotKit is a full-stack framework (opinionated runtime + UI). We want only the UI primitives (assistant-ui) + the wire protocol (AG-UI). assistant-ui's composable primitives align with our contract-driven architecture — we control the runtime, it provides the chat rendering layer.
 
 ### Monorepo & Tooling
 
@@ -393,13 +615,17 @@ Priorities: **typesafety** and **testability** above all else.
 
 | Choice | Why |
 |--------|-----|
-| **Tauri 2.10** | Rust backend, OS webview, tiny binaries, SQLite-friendly |
+| **Tauri 2.10** | Rust backend, OS webview, ~600KB binaries, SQLite-friendly, ~100k GitHub stars |
 
-Tauri considerations baked in now:
-- SQLite for persistence (ships as single file, Tauri can access natively)
-- All backend logic in pure TS/Bun (portable to Tauri's sidecar or Rust FFI later)
-- No server-only features in UI (everything works via IPC or localhost)
-- File paths handled via Tauri's path API abstraction when ready
+Tauri 2.x capabilities:
+- **Channel API** for Rust→JS streaming (perfect for agent event relay)
+- **Raw Request** support for binary/protobuf payloads (AG-UI proto events)
+- **ACL-based security** — per-window command access (restrict agent sessions per window)
+- **Plugin ecosystem** — `@tauri-apps/plugin-{fs,shell,dialog,clipboard,http,websocket,updater,deep-link,sql,store}`
+- SQLite via `@tauri-apps/plugin-sql` (ships as single file)
+- Shell spawning via `@tauri-apps/plugin-shell` (replaces Bun.spawn in desktop mode)
+- All backend logic in pure TS/Bun (portable to Tauri sidecar)
+- **bore** Rust binary as Tauri sidecar for self-hosted tunneling
 
 ### Type Safety Strategy
 
