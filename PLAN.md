@@ -25,28 +25,31 @@ The space is crowded but fragmented. Every tool occupies a specific niche. Nothi
 - **Continue.dev** — VS Code/JetBrains extension, open-source, best MCP integration, model-agnostic. But it's an *extension*, not a shell.
 - **Cursor** — Full IDE (VS Code fork), deep agent integration, background agents, worktrees. But it IS the IDE — you can't use it alongside your existing editor.
 
-**2. Terminal Session Managers (no rich UI)**
+**2. Agent Orchestrator Desktop Apps (closest to us)**
+- **Conductor** (conductor.build, Melty Labs) — **Our closest competitor.** macOS-only desktop app for running parallel Claude Code / Codex agents in isolated git worktrees. Rich UI: diff viewer with turn-by-turn diffs, checkpoints with revert, MCP support, PR creation, workspace-per-feature flow, scratchpad, code review with inline comments, workspace status (backlog/in-progress/in-review/done). Backed by $2.8M funding, used by Linear/Vercel/Notion/Stripe engineers. 250% growth Jan 2026. But: **macOS-only**, **Claude/Codex-only** (no adapter system for arbitrary agents), **no workflow plugin system** (single fixed workflow: create workspace → develop → review → PR → merge), **no standards-based extensibility** (no AG-UI, A2A — direct CLI wrapping only), **no remote web access**, **no mobile**, **no contract architecture for agent concepts** (skills/hooks rendered as Claude Code features, not abstract contracts). It's a well-polished "run Claude Codes in parallel" app, not a universal agent shell.
+- **Agents UI** (macOS, Tauri) — native terminal app for multi-agent sessions. Closest to us in tech (Tauri) but terminal-first, no agent concept UI, no workflows.
+
+**3. Terminal Session Managers (TUI, no rich UI)**
 - **Agent Deck** (Go + Bubble Tea TUI) — multi-agent sessions via tmux, MCP management, worktrees, session forking. Smart status detection. But it's a TUI — no graphical UI, no workflow representation, no chat elements.
 - **Agent of Empires** — multi-agent via tmux + Docker sandboxing. Similar limitations.
 - **Conduit**, **TmuxCC** — same category, less featured.
-- **Agents UI** (macOS, Tauri) — native terminal app for multi-agent sessions. Closest to us architecturally but terminal-first, no agent concept UI, no workflows.
 
-**3. Autonomous Agent Platforms (opinionated, closed)**
+**4. Autonomous Agent Platforms (opinionated, closed)**
 - **Devin** — full VM-based autonomous agent. Rich UI (planner, timeline, browser, editor). But it's *Devin's* UI for *Devin's* agent. Not extensible. Not a shell.
 - **Jules** — Google's async agent. Cloud-only. Rich activity model. But closed platform.
 - **OpenAI Codex App** (macOS, Feb 2026) — multi-agent management, skills as first-class objects. But OpenAI-only.
 
-**4. Agent Frameworks / SDKs (developer tools, not end-user UIs)**
+**5. Agent Frameworks / SDKs (developer tools, not end-user UIs)**
 - **OpenHands** (64k stars) — event-sourced SDK + web UI. Modular V1 architecture. But the UI is a single-agent coding interface, not a multi-agent project shell.
 - **CopilotKit** (28.6k stars) — AG-UI protocol, generative UI, multi-agent orchestration. But it's an *in-app framework* — for embedding agents in YOUR app, not a standalone shell.
 - **Goose** (27k stars, Block) — CLI + desktop, MCP-native, 3000+ MCP servers. But single-agent, no workflow system, minimal UI.
 - **LangGraph** — agent state machines. Backend framework, no UI.
 
-**5. Platform Agent Hubs (locked to platform)**
+**6. Platform Agent Hubs (locked to platform)**
 - **VS Code Agent HQ** — unified multi-agent dashboard within VS Code. Multi-vendor (Copilot, Claude, Codex). But it's inside VS Code — you must use VS Code.
 - **GitHub Copilot Workspace** — most sophisticated staged workflow (spec→plan→implement→verify). But GitHub-only, Copilot-only.
 
-**6. Standards Emerging (protocols, not products)**
+**7. Standards Emerging (protocols, not products)**
 - **AG-UI** (CopilotKit) — agent↔frontend streaming protocol
 - **A2UI** (Google) — declarative agent-generated UI specification
 - **MCP** (Anthropic/Linux Foundation) — agent↔tool protocol
@@ -59,13 +62,14 @@ The space is crowded but fragmented. Every tool occupies a specific niche. Nothi
 |-------------|---------------|
 | IDE extensions with agent features | A standalone shell that works with *any* editor/terminal |
 | TUI session managers for multi-agent | Rich graphical UI for agent concepts (skills, MCPs, hooks, workflows) |
+| Conductor (parallel Claude/Codex, polished UI) | **Agent-agnostic** orchestration (not locked to 2 agents). **Pluggable workflows** (not one fixed flow). **Standards-based** extensibility. Cross-platform + remote access. |
 | Opinionated agent platforms (Devin, Jules) | An *open*, *extensible* shell that any agent can plug into |
 | Agent frameworks for developers | An *end-user* product for managing project-level agent work |
 | Per-agent UIs (each agent has its own) | A *unified* UI that renders any agent's concepts through contracts |
 | Workflow tools (Copilot Workspace) | Workflow support that's *not locked to one agent* |
 | Protocol standards (AG-UI, MCP, A2A) | A product that *implements all of them together* as a coherent shell |
 
-**No one builds the operating environment.** Everyone builds the agent or the IDE or the framework. The gap is: a **standalone, agent-agnostic project shell** with rich UI for the *concepts agents expose* — not the agents themselves.
+**Conductor is the closest competitor** — same category (desktop app for orchestrating coding agents), similar features (worktrees, diff viewer, checkpoints, MCP). But it's a polished **Claude/Codex runner**, not a **universal agent shell**. It has no adapter system, no contract architecture, no workflow plugins, no standards-based extensibility, no remote access, no cross-platform support. We build the operating environment that Conductor's features are a subset of.
 
 ## Differentiation
 
@@ -106,6 +110,7 @@ Think of it as the **desktop environment for AI agents**:
 
 | vs. | Their approach | Our differentiation |
 |-----|---------------|-------------------|
+| **Conductor** | macOS app for parallel Claude/Codex in worktrees. Diff viewer, checkpoints, PR flow. $2.8M funded. | **Cross-platform** (not macOS-only). **Any agent** via adapters (not just Claude/Codex). **Standards-based** (AG-UI, MCP, A2A — not just CLI wrapping). **Workflow plugins** (not one fixed flow). **Remote web access** + mobile. **Abstract contracts** for agent concepts (skills/hooks/MCPs work for any agent, not just Claude's). Conductor is a polished parallel-Claude runner; we're the universal agent operating environment. |
 | **Agent Deck** | TUI over tmux. Multi-agent sessions. | Rich graphical UI. Agent concept components (skills, MCPs, hooks). Workflow system. Remote access. |
 | **Agents UI** | Native terminal app (Tauri). Multi-session. | Same tech (Tauri), but we add contract-driven concept UI, workflow plugins, responsive web access. |
 | **VS Code Agent HQ** | Multi-agent dashboard inside VS Code. | Standalone — works with any editor. Deeper agent concept UI. Not locked to VS Code ecosystem. |
