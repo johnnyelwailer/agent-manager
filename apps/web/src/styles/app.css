@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: var(--color-white);
+  --color-surface-elevated: var(--color-zinc-50);
+  --color-border: var(--color-zinc-200);
+  --color-text-primary: var(--color-zinc-900);
+  --color-text-secondary: var(--color-zinc-500);
+  --color-text-muted: var(--color-zinc-400);
+  --color-accent: var(--color-blue-500);
+  --color-accent-hover: var(--color-blue-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: var(--color-zinc-950);
+    --color-surface-elevated: var(--color-zinc-900);
+    --color-border: var(--color-zinc-800);
+    --color-text-primary: var(--color-zinc-100);
+    --color-text-secondary: var(--color-zinc-400);
+    --color-text-muted: var(--color-zinc-500);
+    --color-accent: var(--color-blue-400);
+    --color-accent-hover: var(--color-blue-300);
+  }
+}
+
+body {
+  @apply bg-surface text-text-primary antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+}
