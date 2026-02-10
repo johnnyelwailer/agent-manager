@@ -20,25 +20,26 @@ function formatTokens(count: number): string {
 export function CostTicker({ element, className }: CostTickerProps) {
   return (
     <div
+      data-slot="cost-ticker"
       className={cn(
-        'inline-flex items-center gap-3 rounded-md bg-zinc-100 px-2.5 py-1 text-xs dark:bg-zinc-800',
+        'inline-flex items-center gap-3 rounded-md bg-muted px-2.5 py-1 text-xs',
         className,
       )}
     >
-      <span className="font-medium text-zinc-700 dark:text-zinc-200">
+      <span className="font-medium text-foreground">
         {formatCost(element.costUsd)}
       </span>
-      <span className="text-zinc-400 dark:text-zinc-500">|</span>
-      <span className="text-zinc-500 dark:text-zinc-400" title="Tokens in">
+      <span className="text-muted-foreground">|</span>
+      <span className="text-muted-foreground" title="Tokens in">
         {formatTokens(element.tokensIn)} in
       </span>
-      <span className="text-zinc-500 dark:text-zinc-400" title="Tokens out">
+      <span className="text-muted-foreground" title="Tokens out">
         {formatTokens(element.tokensOut)} out
       </span>
       {element.model && (
         <>
-          <span className="text-zinc-400 dark:text-zinc-500">|</span>
-          <span className="text-zinc-500 dark:text-zinc-400">{element.model}</span>
+          <span className="text-muted-foreground">|</span>
+          <span className="text-muted-foreground">{element.model}</span>
         </>
       )}
     </div>

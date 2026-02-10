@@ -9,18 +9,21 @@ export interface ProgressIndicatorProps {
 const statusColors = {
   running: 'bg-blue-500',
   completed: 'bg-green-500',
-  failed: 'bg-red-500',
-  cancelled: 'bg-zinc-400',
+  failed: 'bg-destructive',
+  cancelled: 'bg-muted-foreground',
 };
 
 export function ProgressIndicator({ element, className }: ProgressIndicatorProps) {
   return (
-    <div className={cn('rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950', className)}>
+    <div
+      data-slot="progress-indicator"
+      className={cn('rounded-xl border border-border bg-card p-3', className)}
+    >
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-zinc-900 dark:text-zinc-100">{element.label}</span>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">{element.progress}%</span>
+        <span className="font-medium text-card-foreground">{element.label}</span>
+        <span className="text-xs text-muted-foreground">{element.progress}%</span>
       </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             'h-full rounded-full transition-all',
@@ -31,7 +34,7 @@ export function ProgressIndicator({ element, className }: ProgressIndicatorProps
         />
       </div>
       {element.details && (
-        <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{element.details}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{element.details}</p>
       )}
     </div>
   );

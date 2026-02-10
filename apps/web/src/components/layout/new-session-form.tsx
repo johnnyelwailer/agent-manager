@@ -23,14 +23,14 @@ export function NewSessionForm({ adapters, onSubmit, loading, className }: NewSe
   return (
     <form onSubmit={handleSubmit} className={cn('space-y-3', className)}>
       <div>
-        <label className="block text-xs font-medium text-text-secondary" htmlFor="adapter">
+        <label className="block text-xs font-medium text-muted-foreground" htmlFor="adapter">
           Agent
         </label>
         <select
           id="adapter"
           value={adapterId}
           onChange={(e) => setAdapterId(e.target.value)}
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text-primary"
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
         >
           {adapters.map((a) => (
             <option key={a.id} value={a.id} disabled={!a.available}>
@@ -40,7 +40,7 @@ export function NewSessionForm({ adapters, onSubmit, loading, className }: NewSe
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-text-secondary" htmlFor="cwd">
+        <label className="block text-xs font-medium text-muted-foreground" htmlFor="cwd">
           Working Directory
         </label>
         <input
@@ -49,11 +49,11 @@ export function NewSessionForm({ adapters, onSubmit, loading, className }: NewSe
           value={cwd}
           onChange={(e) => setCwd(e.target.value)}
           placeholder="/path/to/project"
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted"
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-text-secondary" htmlFor="prompt">
+        <label className="block text-xs font-medium text-muted-foreground" htmlFor="prompt">
           Prompt
         </label>
         <textarea
@@ -62,13 +62,13 @@ export function NewSessionForm({ adapters, onSubmit, loading, className }: NewSe
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the task..."
           rows={3}
-          className="mt-1 w-full resize-none rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted"
+          className="mt-1 w-full resize-none rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
         />
       </div>
       <button
         type="submit"
         disabled={!prompt.trim() || !cwd.trim() || loading}
-        className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
       >
         {loading ? 'Starting...' : 'Start Session'}
       </button>

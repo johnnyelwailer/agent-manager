@@ -14,33 +14,34 @@ function isClaudeSkill(skill: SkillContract | SpecializedSkillContract): skill i
 export function SkillCard({ skill, onActivate, className }: SkillCardProps) {
   return (
     <div
+      data-slot="skill-card"
       className={cn(
-        'group rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700',
+        'group rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors hover:border-ring/50',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <h3 className="truncate text-sm font-semibold">
               {skill.name}
             </h3>
             {skill.autoDiscoverable && (
-              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              <span className="shrink-0 rounded-md border border-transparent bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                 auto
               </span>
             )}
             {!skill.enabled && (
-              <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              <span className="shrink-0 rounded-md border border-transparent bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                 disabled
               </span>
             )}
           </div>
-          <p className="mt-1 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
             {skill.description}
           </p>
           {isClaudeSkill(skill) && skill.slashCommand && (
-            <code className="mt-2 inline-block rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <code className="mt-2 inline-block rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono text-secondary-foreground">
               /{skill.slashCommand}
             </code>
           )}
@@ -48,7 +49,7 @@ export function SkillCard({ skill, onActivate, className }: SkillCardProps) {
         {onActivate && skill.enabled && (
           <button
             onClick={() => onActivate(skill.id)}
-            className="shrink-0 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-100 dark:text-zinc-900"
+            className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-primary/90"
           >
             Run
           </button>
@@ -59,7 +60,7 @@ export function SkillCard({ skill, onActivate, className }: SkillCardProps) {
           {skill.tags.map((tag) => (
             <span
               key={tag}
-              className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              className="rounded-md bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
             >
               {tag}
             </span>

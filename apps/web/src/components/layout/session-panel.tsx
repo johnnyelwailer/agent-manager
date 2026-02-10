@@ -10,11 +10,11 @@ export interface SessionPanelProps {
 function EventItem({ event }: { event: AgentEvent }) {
   switch (event.type) {
     case 'text_delta':
-      return <span className="text-sm text-text-primary">{event.text}</span>;
+      return <span className="text-sm text-foreground">{event.text}</span>;
 
     case 'thinking':
       return (
-        <div className="rounded bg-zinc-100 px-3 py-2 text-xs italic text-text-secondary dark:bg-zinc-900">
+        <div className="rounded-lg bg-muted px-3 py-2 text-xs italic text-muted-foreground">
           {event.text}
         </div>
       );
@@ -36,19 +36,19 @@ function EventItem({ event }: { event: AgentEvent }) {
     case 'tool_result':
       return (
         <div className={cn(
-          'rounded border px-3 py-2 text-xs font-mono',
+          'rounded-lg border px-3 py-2 text-xs font-mono',
           event.isError
-            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/10 dark:text-red-300'
-            : 'border-zinc-200 bg-zinc-50 text-text-secondary dark:border-zinc-800 dark:bg-zinc-900',
+            ? 'border-destructive/50 bg-destructive/10 text-destructive'
+            : 'border-border bg-muted text-muted-foreground',
         )}>
-          <div className="mb-1 text-xs font-sans text-text-muted">{event.toolName} result</div>
+          <div className="mb-1 text-xs font-sans text-muted-foreground">{event.toolName} result</div>
           <div className="max-h-32 overflow-auto whitespace-pre-wrap">{event.output}</div>
         </div>
       );
 
     case 'error':
       return (
-        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/10 dark:text-red-300">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Error: {event.message}
         </div>
       );
@@ -68,7 +68,7 @@ function EventItem({ event }: { event: AgentEvent }) {
 
     case 'session_start':
       return (
-        <div className="text-xs text-text-muted">
+        <div className="text-xs text-muted-foreground">
           Session started &middot; {event.model} &middot; {event.cwd}
         </div>
       );
@@ -76,10 +76,10 @@ function EventItem({ event }: { event: AgentEvent }) {
     case 'session_end':
       return (
         <div className={cn(
-          'rounded px-3 py-2 text-xs',
+          'rounded-lg px-3 py-2 text-xs',
           event.result === 'success'
             ? 'bg-green-50 text-green-700 dark:bg-green-900/10 dark:text-green-300'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/10 dark:text-red-300',
+            : 'bg-destructive/10 text-destructive',
         )}>
           Session ended: {event.result} &middot; ${event.costUsd.toFixed(4)} &middot; {(event.durationMs / 1000).toFixed(1)}s
         </div>
@@ -95,8 +95,8 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
     return (
       <div className={cn('flex h-full items-center justify-center', className)}>
         <div className="text-center">
-          <p className="text-sm text-text-secondary">Select a session to view</p>
-          <p className="mt-1 text-xs text-text-muted">or start a new one</p>
+          <p className="text-sm text-muted-foreground">Select a session to view</p>
+          <p className="mt-1 text-xs text-muted-foreground">or start a new one</p>
         </div>
       </div>
     );
@@ -113,7 +113,7 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
     }
     if (textBuffer) {
       rendered.push(
-        <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-text-primary">
+        <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-foreground">
           {textBuffer}
         </div>,
       );
@@ -123,7 +123,7 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
   }
   if (textBuffer) {
     rendered.push(
-      <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-text-primary">
+      <div key={`text-${rendered.length}`} className="whitespace-pre-wrap text-sm text-foreground">
         {textBuffer}
       </div>,
     );
@@ -134,8 +134,8 @@ export function SessionPanel({ session, className }: SessionPanelProps) {
       {/* Session header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-text-primary">{session.prompt}</div>
-          <div className="mt-0.5 text-xs text-text-muted">
+          <div className="truncate text-sm font-medium text-foreground">{session.prompt}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
             {session.adapterId} &middot; {session.status}
             {session.model && ` \u00b7 ${session.model}`}
           </div>

@@ -8,20 +8,20 @@ export interface TaskCardProps {
   className?: string;
 }
 
-const statusConfig: Record<TaskContractStatus, { label: string; color: string; icon: string }> = {
-  pending: { label: 'Pending', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400', icon: '○' },
-  in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', icon: '◐' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', icon: '●' },
-  failed: { label: 'Failed', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300', icon: '✕' },
-  blocked: { label: 'Blocked', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', icon: '⊘' },
-  cancelled: { label: 'Cancelled', color: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500', icon: '—' },
+const statusConfig: Record<TaskContractStatus, { label: string; badgeClass: string; icon: string }> = {
+  pending: { label: 'Pending', badgeClass: 'bg-secondary text-secondary-foreground', icon: '\u25CB' },
+  in_progress: { label: 'In Progress', badgeClass: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: '\u25D0' },
+  completed: { label: 'Completed', badgeClass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', icon: '\u25CF' },
+  failed: { label: 'Failed', badgeClass: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', icon: '\u2715' },
+  blocked: { label: 'Blocked', badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', icon: '\u2298' },
+  cancelled: { label: 'Cancelled', badgeClass: 'bg-muted text-muted-foreground', icon: '\u2014' },
 };
 
 const priorityColors: Record<string, string> = {
   critical: 'border-l-red-500',
   high: 'border-l-orange-500',
   medium: 'border-l-blue-500',
-  low: 'border-l-zinc-300 dark:border-l-zinc-600',
+  low: 'border-l-border',
 };
 
 export function TaskCard({ task, onSelect, compact, className }: TaskCardProps) {
@@ -30,11 +30,12 @@ export function TaskCard({ task, onSelect, compact, className }: TaskCardProps) 
 
   return (
     <div
+      data-slot="task-card"
       onClick={onSelect ? () => onSelect(task.id) : undefined}
       className={cn(
-        'rounded-lg border border-zinc-200 bg-white transition-colors dark:border-zinc-800 dark:bg-zinc-950',
+        'rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-colors',
         task.priority ? `border-l-2 ${priorityColors[task.priority] ?? ''}` : '',
-        onSelect ? 'cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700' : '',
+        onSelect ? 'cursor-pointer hover:border-ring/50' : '',
         compact ? 'p-3' : 'p-4',
         className,
       )}
@@ -44,53 +45,50 @@ export function TaskCard({ task, onSelect, compact, className }: TaskCardProps) 
           <div className="flex items-center gap-2">
             <span className="text-sm" title={status.label}>{status.icon}</span>
             <h3 className={cn(
-              'truncate font-medium text-zinc-900 dark:text-zinc-100',
+              'truncate font-semibold',
               compact ? 'text-xs' : 'text-sm',
             )}>
               {task.title}
             </h3>
           </div>
           {!compact && task.description && (
-            <p className="mt-1 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
               {task.description}
             </p>
           )}
         </div>
-        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', status.color)}>
+        <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold', status.badgeClass)}>
           {status.label}
         </span>
       </div>
 
-      {/* Progress bar */}
       {task.progress !== undefined && (
         <div className="mt-3">
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Progress</span>
             <span>{task.progress}%</span>
           </div>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${task.progress}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Subtasks */}
       {!compact && task.subtasks.length > 0 && (
-        <div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="mt-3 text-xs text-muted-foreground">
           {completedSubtasks}/{task.subtasks.length} subtasks completed
         </div>
       )}
 
-      {/* Labels */}
       {!compact && task.labels.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {task.labels.map((label) => (
             <span
               key={label}
-              className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              className="rounded-md bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
             >
               {label}
             </span>
