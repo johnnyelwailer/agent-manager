@@ -45,6 +45,12 @@ test('full page', async ({ page }) => {
 // App Shell — High-Level Screens
 // ---------------------------------------------------------------------------
 
+test('app-shell-landing', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-landing"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-landing.png', ssOpts);
+});
+
 test('app-shell-running', async ({ page }) => {
   const el = page.locator('[data-testid="ss-shell-running"]');
   await el.scrollIntoViewIfNeeded();
@@ -55,12 +61,6 @@ test('app-shell-completed', async ({ page }) => {
   const el = page.locator('[data-testid="ss-shell-completed"]');
   await el.scrollIntoViewIfNeeded();
   await expect(el).toHaveScreenshot('shell-completed.png', ssOpts);
-});
-
-test('app-shell-empty', async ({ page }) => {
-  const el = page.locator('[data-testid="ss-shell-empty"]');
-  await el.scrollIntoViewIfNeeded();
-  await expect(el).toHaveScreenshot('shell-empty.png', ssOpts);
 });
 
 test('app-shell-three-panel', async ({ page }) => {
@@ -81,16 +81,16 @@ test('app-shell-collapsed', async ({ page }) => {
   await expect(el).toHaveScreenshot('shell-collapsed.png', ssOpts);
 });
 
-test('app-shell-no-sessions', async ({ page }) => {
-  const el = page.locator('[data-testid="ss-shell-no-sessions"]');
+test('app-shell-skills', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-skills"]');
   await el.scrollIntoViewIfNeeded();
-  await expect(el).toHaveScreenshot('shell-no-sessions.png', ssOpts);
+  await expect(el).toHaveScreenshot('shell-skills.png', ssOpts);
 });
 
-test('app-shell-detail-collapsed', async ({ page }) => {
-  const el = page.locator('[data-testid="ss-shell-detail-collapsed"]');
+test('app-shell-empty', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-empty"]');
   await el.scrollIntoViewIfNeeded();
-  await expect(el).toHaveScreenshot('shell-detail-collapsed.png', ssOpts);
+  await expect(el).toHaveScreenshot('shell-empty.png', ssOpts);
 });
 
 // ---------------------------------------------------------------------------

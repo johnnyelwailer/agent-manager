@@ -371,7 +371,7 @@ const mockRunningSession: SessionInfo = {
   ],
 };
 
-// Session summaries for sidebar list
+// Session summaries for nav tree
 const mockSessionSummaries: SessionSummary[] = [
   { sessionId: 'demo-session-running', adapterId: 'claude-code', prompt: 'Add unit tests for the payment processing module', status: 'running', startedAt: '2026-02-10T14:00:00Z', costUsd: 0.0312, eventCount: 6, cwd: '/home/user/project', tokensIn: 8500, tokensOut: 1200 },
   { sessionId: 'demo-session-1', adapterId: 'claude-code', prompt: 'Help me refactor the authentication module to use JWT tokens', status: 'completed', startedAt: '2026-02-10T12:00:00Z', endedAt: '2026-02-10T12:05:00Z', costUsd: 0.0847, eventCount: 11, cwd: '/home/user/project', tokensIn: 24500, tokensOut: 3200 },
@@ -381,55 +381,303 @@ const mockSessionSummaries: SessionSummary[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Mock inline sidebar for high-level screens (avoids store dependencies)
+// Hierarchical semantic navigation tree
 // ---------------------------------------------------------------------------
 
-function MockSidebarContent({
-  sessions,
-  activeSessionId,
-  onSelectSession,
+const statusDotClass: Record<string, string> = {
+  running: 'bg-blue-500 animate-pulse',
+  completed: 'bg-green-500',
+  failed: 'bg-red-500',
+  starting: 'bg-amber-500',
+  interrupted: 'bg-muted-foreground',
+  connected: 'bg-green-500',
+  error: 'bg-red-500',
+  connecting: 'bg-amber-500',
+  clean: 'bg-green-500',
+  dirty: 'bg-amber-500',
+  conflict: 'bg-red-500',
+  detached: 'bg-muted-foreground',
+};
+
+function TreeRow({
+  indent,
+  expanded,
+  dot,
+  label,
+  badge,
+  selected,
+  dimmed,
 }: {
-  sessions: SessionSummary[];
-  activeSessionId: string | null;
-  onSelectSession: (id: string) => void;
+  indent: number;
+  expanded?: boolean | null | undefined;
+  dot?: string | undefined;
+  label: string;
+  badge?: string | undefined;
+  selected?: boolean | undefined;
+  dimmed?: boolean | undefined;
 }) {
-  const statusColors: Record<string, string> = {
-    starting: 'bg-amber-500',
-    running: 'bg-blue-500 animate-pulse',
-    completed: 'bg-green-500',
-    failed: 'bg-red-500',
-    interrupted: 'bg-muted-foreground',
-  };
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 rounded-md py-1 text-xs',
+        selected ? 'bg-accent text-accent-foreground' : 'text-foreground/80',
+        dimmed && 'opacity-50',
+      )}
+      style={{ paddingLeft: `${indent * 12 + 8}px`, paddingRight: '8px' }}
+    >
+      {expanded !== null && expanded !== undefined ? (
+        <span className="w-3 shrink-0 text-center text-[10px] text-muted-foreground">
+          {expanded ? '\u25BC' : '\u25B6'}
+        </span>
+      ) : (
+        <span className="w-3 shrink-0" />
+      )}
+      {dot && <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />}
+      <span className="truncate">{label}</span>
+      {badge && (
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{badge}</span>
+      )}
+    </div>
+  );
+}
+
+// Adapter-provided skills for nav tree and command actions
+const mockAdapterSkills = [
+  { id: 'plan', cmd: '/plan', label: 'Plan implementation' },
+  { id: 'review', cmd: '/review', label: 'Review code' },
+  { id: 'commit', cmd: '/commit', label: 'Git commit' },
+  { id: 'debug', cmd: '/debug', label: 'Debug issue' },
+  { id: 'test', cmd: '/test', label: 'Run tests' },
+  { id: 'refactor', cmd: '/refactor', label: 'Refactor code' },
+];
+
+const claudeSessions = mockSessionSummaries.filter((s) => s.adapterId === 'claude-code');
+const aiderSessions = mockSessionSummaries.filter((s) => s.adapterId === 'aider');
+
+interface NavTreeConfig {
+  expandSessions?: boolean;
+  expandSkills?: boolean;
+  expandMcp?: boolean;
+  expandAider?: boolean;
+  expandWorkspaces?: boolean;
+  selectedNode?: string;
+  empty?: boolean;
+}
+
+function MockNavTree({
+  expandSessions = true,
+  expandSkills = false,
+  expandMcp = false,
+  expandAider = false,
+  expandWorkspaces = true,
+  selectedNode,
+  empty = false,
+}: NavTreeConfig) {
+  return (
+    <div className="flex h-full flex-col py-2">
+      {empty ? (
+        <div className="flex flex-1 items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">No agents connected</p>
+            <p className="mt-1 text-[10px] text-muted-foreground/60">
+              Configure an adapter to get started
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {/* AGENTS section */}
+          <div className="px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Agents
+            </span>
+          </div>
+
+          {/* claude-code adapter */}
+          <TreeRow indent={0} expanded={true} dot={statusDotClass.connected} label="claude-code" />
+
+          <TreeRow
+            indent={1}
+            expanded={expandSessions}
+            label="Sessions"
+            badge={expandSessions ? undefined : String(claudeSessions.length)}
+          />
+          {expandSessions &&
+            claudeSessions.map((s) => (
+              <TreeRow
+                key={s.sessionId}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                label={s.prompt}
+                selected={selectedNode === `session:${s.sessionId}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandSkills}
+            label="Skills"
+            badge={expandSkills ? undefined : String(mockAdapterSkills.length)}
+          />
+          {expandSkills &&
+            mockAdapterSkills.map((skill) => (
+              <TreeRow
+                key={skill.id}
+                indent={2}
+                expanded={null}
+                label={`${skill.cmd} \u2014 ${skill.label}`}
+                selected={selectedNode === `skill:${skill.id}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandMcp}
+            label="MCP Servers"
+            badge={expandMcp ? undefined : String(mockMcpServers.length)}
+          />
+          {expandMcp &&
+            mockMcpServers.map((s) => (
+              <TreeRow
+                key={s.id}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                label={s.name}
+                badge={`${s.tools.length} tools`}
+              />
+            ))}
+
+          {/* aider adapter */}
+          <TreeRow
+            indent={0}
+            expanded={expandAider}
+            dot={statusDotClass.starting}
+            label="aider"
+            dimmed
+          />
+          {expandAider && (
+            <>
+              <TreeRow indent={1} expanded={true} label="Sessions" />
+              {aiderSessions.map((s) => (
+                <TreeRow
+                  key={s.sessionId}
+                  indent={2}
+                  expanded={null}
+                  dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                  label={s.prompt}
+                  selected={selectedNode === `session:${s.sessionId}`}
+                />
+              ))}
+            </>
+          )}
+
+          {/* WORKSPACES section */}
+          <div className="mt-3 px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Workspaces
+            </span>
+          </div>
+          {mockWorktrees.map((wt) => (
+            <TreeRow
+              key={wt.id}
+              indent={0}
+              expanded={null}
+              dot={statusDotClass[wt.status] ?? 'bg-muted-foreground'}
+              label={wt.branch}
+              badge={wt.changedFiles > 0 ? `${wt.changedFiles} files` : wt.status}
+              selected={selectedNode === `workspace:${wt.id}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Settings at bottom */}
+      <div className="border-t border-border px-2 pt-2">
+        <TreeRow indent={0} expanded={null} label="Settings" selected={selectedNode === 'settings'} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Context-sensitive command actions (adapter-provided, predicted)
+// ---------------------------------------------------------------------------
+
+function MockCommandActions() {
+  const actions = [
+    { id: 'plan', cmd: '/plan', description: 'Design an implementation strategy for a feature' },
+    { id: 'review', cmd: '/review', description: 'Review and analyze recent code changes' },
+    { id: 'commit', cmd: '/commit', description: 'Stage changes and create a commit' },
+    { id: 'debug', cmd: '/debug', description: 'Investigate and fix a failing test or bug' },
+    { id: 'test', cmd: '/test', description: 'Write or run test suites' },
+    { id: 'refactor', cmd: '/refactor', description: 'Restructure code for clarity or performance' },
+  ];
+
+  const contextHints = [
+    { text: 'feature/auth has 5 uncommitted files', status: 'warning' as const },
+    { text: 'postgres MCP server: connection refused', status: 'error' as const },
+    { text: '1 session currently running', status: 'info' as const },
+  ];
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h1 className="text-sm font-semibold text-foreground">Agent Manager</h1>
-        <div className="h-2 w-2 rounded-full bg-green-500" title="Connected" />
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-3 py-2">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sessions</h2>
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="w-full max-w-lg space-y-6">
+        {/* Provider badge */}
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span className="text-xs font-medium text-muted-foreground">claude-code</span>
         </div>
-        <div className="space-y-0.5 px-2">
-          {sessions.map((session) => (
-            <button
-              key={session.sessionId}
-              onClick={() => onSelectSession(session.sessionId)}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors',
-                session.sessionId === activeSessionId
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-              )}
-            >
-              <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', statusColors[session.status] ?? 'bg-muted-foreground')} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium">{session.prompt}</div>
-                <div className="text-xs text-muted-foreground">${session.costUsd.toFixed(4)}</div>
+
+        {/* Actions grid */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Suggested Actions</h2>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {actions.map((action) => (
+              <div
+                key={action.id}
+                className="flex flex-col rounded-lg border border-border px-3 py-2.5"
+              >
+                <span className="text-sm font-medium text-foreground">{action.cmd}</span>
+                <span className="mt-0.5 text-xs text-muted-foreground">{action.description}</span>
               </div>
-            </button>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        {/* Context hints */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Context</h2>
+          <div className="mt-2 space-y-1.5">
+            {contextHints.map((hint, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    hint.status === 'error'
+                      ? 'bg-red-500'
+                      : hint.status === 'warning'
+                        ? 'bg-amber-500'
+                        : 'bg-blue-500',
+                  )}
+                />
+                <span>{hint.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Composer */}
+        <div className="flex items-end gap-2">
+          <div className="min-h-[40px] flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-muted-foreground">
+            Ask anything or type / for commands...
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" />
+            </svg>
+          </div>
         </div>
       </div>
     </div>
@@ -437,14 +685,14 @@ function MockSidebarContent({
 }
 
 // ---------------------------------------------------------------------------
-// Mock detail panel content for 3-panel layout
+// Detail panel — tasks, skills, MCP, hooks (no pricing)
 // ---------------------------------------------------------------------------
 
 function MockDetailContent() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Session Details</h2>
+        <h2 className="text-sm font-semibold text-foreground">Session Context</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
@@ -457,21 +705,57 @@ function MockDetailContent() {
         </div>
         <Separator />
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cost</h3>
-          <div className="mt-2">
-            <CostTicker element={{ type: 'cost_ticker', id: 'detail-cost', costUsd: 0.0847, tokensIn: 24500, tokensOut: 3200 }} />
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Available Skills
+          </h3>
+          <div className="mt-2 space-y-1">
+            {mockAdapterSkills.slice(0, 4).map((s) => (
+              <div key={s.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-mono">{s.cmd}</span>
+                <span className="text-muted-foreground/60">{s.label}</span>
+              </div>
+            ))}
           </div>
         </div>
         <Separator />
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">MCP Servers</h3>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            MCP Servers
+          </h3>
           <div className="mt-2 space-y-1">
             {mockMcpServers.map((s) => (
               <div key={s.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className={cn('h-1.5 w-1.5 rounded-full', s.status === 'connected' ? 'bg-green-500' : s.status === 'error' ? 'bg-red-500' : 'bg-amber-500')} />
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    s.status === 'connected'
+                      ? 'bg-green-500'
+                      : s.status === 'error'
+                        ? 'bg-red-500'
+                        : 'bg-amber-500',
+                  )}
+                />
                 <span>{s.name}</span>
+                <span className="ml-auto text-[10px]">{s.tools.length} tools</span>
               </div>
             ))}
+          </div>
+        </div>
+        <Separator />
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Active Hooks
+          </h3>
+          <div className="mt-2 space-y-1">
+            {mockHooks
+              .filter((h) => h.enabled)
+              .map((h) => (
+                <div key={h.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  <span>{h.name}</span>
+                  <span className="ml-auto text-[10px]">{h.event}</span>
+                </div>
+              ))}
           </div>
         </div>
       </div>
@@ -480,35 +764,17 @@ function MockDetailContent() {
 }
 
 // ---------------------------------------------------------------------------
-// Mock navbar for high-level screen snapshots
+// Navbar — branding + connection status
 // ---------------------------------------------------------------------------
 
-function MockNavbar({ layoutLabel }: { layoutLabel?: string }) {
-  const navItems = ['Ops', 'Sessions', 'Settings'];
+function MockNavbar() {
   return (
     <ShellNavbar
-      leading={
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-foreground">Agent Manager</span>
-          <div className="ml-2 h-2 w-2 rounded-full bg-green-500" />
-          {layoutLabel && (
-            <Badge variant="outline" className="ml-2 text-[10px]">{layoutLabel}</Badge>
-          )}
-        </div>
-      }
+      leading={<span className="text-sm font-semibold text-foreground">Agent Manager</span>}
       trailing={
-        <div className="flex items-center gap-1">
-          {navItems.map((label) => (
-            <span
-              key={label}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors',
-                label === 'Ops' && 'bg-accent text-accent-foreground',
-              )}
-            >
-              {label}
-            </span>
-          ))}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span>Connected</span>
         </div>
       }
     />
@@ -516,17 +782,19 @@ function MockNavbar({ layoutLabel }: { layoutLabel?: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock status bar for high-level screens
+// Status bar — workspace context (no pricing)
 // ---------------------------------------------------------------------------
 
 function MockStatusBar() {
   return (
     <ShellStatusBar>
-      <span>2 agents connected</span>
+      <span>claude-code</span>
       <span className="text-border">|</span>
-      <span>5 sessions</span>
+      <span>feature/auth</span>
       <span className="text-border">|</span>
       <span>3 MCP servers</span>
+      <span className="text-border">|</span>
+      <span>1 running</span>
       <span className="flex-1" />
       <span>v0.1.0</span>
     </ShellStatusBar>
@@ -534,49 +802,59 @@ function MockStatusBar() {
 }
 
 // ---------------------------------------------------------------------------
-// Mock empty main content (new session form)
+// Static chat panel (no cost ticker, no assistant-ui runtime)
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Mock static chat panel for high-level screens (no assistant-ui runtime)
-// ---------------------------------------------------------------------------
-
-function MockChatPanel({ session, variant = 'completed' }: { session: SessionInfo; variant?: 'running' | 'completed' }) {
-  // Cast events to any[] for mock rendering — these are display-only snapshots
+function MockChatPanel({
+  session,
+  variant = 'completed',
+}: {
+  session: SessionInfo;
+  variant?: 'running' | 'completed';
+}) {
   const events = (session.events ?? []) as Array<Record<string, any>>;
-  const thinkingText = events.find((e) => e.type === 'thinking')?.text ?? 'Analyzing the request...';
-  const assistantText = events.filter((e) => e.type === 'text_delta').map((e) => e.text).join('') || 'Working on the task...';
+  const thinkingText =
+    events.find((e) => e.type === 'thinking')?.text ?? 'Analyzing the request...';
+  const assistantText =
+    events
+      .filter((e) => e.type === 'text_delta')
+      .map((e) => e.text)
+      .join('') || 'Working on the task...';
   const toolCalls = events.filter((e) => e.type === 'tool_call');
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-foreground">{session.prompt}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {session.adapterId} &middot; {session.status}
-            {session.model && ` \u00b7 ${session.model}`}
-          </div>
+      {/* Header — adapter + model + status, no cost */}
+      <div className="border-b border-border px-4 py-3">
+        <div className="truncate text-sm font-medium text-foreground">{session.prompt}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{session.adapterId}</span>
+          <span>&middot;</span>
+          {session.model && (
+            <>
+              <span>{session.model}</span>
+              <span>&middot;</span>
+            </>
+          )}
+          <Badge
+            variant={variant === 'running' ? 'secondary' : 'outline'}
+            className="text-[10px] px-1.5 py-0"
+          >
+            {session.status}
+          </Badge>
         </div>
-        <CostTicker element={{ type: 'cost_ticker', id: 'mock-cost', costUsd: session.costUsd, tokensIn: session.tokensIn, tokensOut: session.tokensOut }} />
       </div>
 
-      {/* Static message thread */}
+      {/* Message thread */}
       <div className="flex-1 overflow-y-auto">
-        {/* Thinking block */}
         <div className="px-4 py-3">
           <div className="rounded-lg bg-muted/50 px-3 py-2">
             <p className="text-xs text-muted-foreground italic">{thinkingText}</p>
           </div>
         </div>
-
-        {/* Assistant text */}
         <div className="px-4 py-2">
           <div className="text-sm text-foreground">{assistantText}</div>
         </div>
-
-        {/* Tool calls */}
         {toolCalls.map((e) => (
           <div key={e.id} className="px-4 py-1">
             <ToolCallViewer
@@ -585,7 +863,9 @@ function MockChatPanel({ session, variant = 'completed' }: { session: SessionInf
                 id: e.id,
                 toolName: e.toolName,
                 input: e.input,
-                output: events.find((r) => r.type === 'tool_result' && r.toolUseId === e.toolUseId)?.output ?? '',
+                output:
+                  events.find((r) => r.type === 'tool_result' && r.toolUseId === e.toolUseId)
+                    ?.output ?? '',
                 collapsed: true,
                 isError: false,
               }}
@@ -606,7 +886,14 @@ function MockChatPanel({ session, variant = 'completed' }: { session: SessionInf
             </div>
           ) : (
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" /></svg>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 12h14m-7-7l7 7-7 7"
+                />
+              </svg>
             </div>
           )}
         </div>
@@ -615,25 +902,20 @@ function MockChatPanel({ session, variant = 'completed' }: { session: SessionInf
   );
 }
 
-function MockEmptyMain() {
+// ---------------------------------------------------------------------------
+// Empty / welcome state
+// ---------------------------------------------------------------------------
+
+function MockEmptyWelcome() {
   return (
     <div className="flex h-full items-center justify-center p-8">
-      <div className="w-full max-w-md">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">New Session</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">Agent</label>
-            <div className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground">claude-code</div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">Working Directory</label>
-            <div className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-muted-foreground">/path/to/project</div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">Prompt</label>
-            <div className="mt-1 h-20 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-muted-foreground">Describe the task...</div>
-          </div>
-          <div className="w-full rounded-md bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground">Start Session</div>
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-foreground">Welcome to Agent Manager</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Connect an adapter to start managing your AI agents.
+        </p>
+        <div className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          Configure Adapter
         </div>
       </div>
     </div>
@@ -663,17 +945,30 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         <Section title="App Shell — High-Level Screens" testId="section-app-shell">
 
-          {/* ---- 1. Sidebar + Chat (Running Session) ---- */}
-          <SubSection title="Sidebar + Chat — Running Session" testId="ss-shell-running">
+          {/* ---- 1. Landing — Nav tree + context-sensitive commands ---- */}
+          <SubSection title="Landing — Nav Tree + Suggested Actions" testId="ss-shell-landing">
             <div className="h-[600px] rounded-xl border border-border overflow-hidden">
               <AppShell
                 defaultLayout="sidebar-main"
-                navbar={<MockNavbar layoutLabel="sidebar-main" />}
+                navbar={<MockNavbar />}
+                sidebar={<MockNavTree expandSessions={true} expandWorkspaces={true} />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockCommandActions />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 2. Running session ---- */}
+          <SubSection title="Nav Tree + Running Session" testId="ss-shell-running">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
                 sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-running"
-                    onSelectSession={() => {}}
+                  <MockNavTree
+                    expandSessions={true}
+                    selectedNode="session:demo-session-running"
                   />
                 }
                 statusBar={<MockStatusBar />}
@@ -683,145 +978,109 @@ export function SnapshotsPage() {
             </div>
           </SubSection>
 
-          {/* ---- 2. Sidebar + Chat (Completed Session) ---- */}
-          <SubSection title="Sidebar + Chat — Completed Session" testId="ss-shell-completed">
+          {/* ---- 3. Completed session ---- */}
+          <SubSection title="Nav Tree + Completed Session" testId="ss-shell-completed">
             <div className="h-[600px] rounded-xl border border-border overflow-hidden">
-              <AppShell
-                defaultLayout="sidebar-main"
-                navbar={<MockNavbar layoutLabel="sidebar-main" />}
-                sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-1"
-                    onSelectSession={() => {}}
-                  />
-                }
-                statusBar={<MockStatusBar />}
-              >
-                <MockChatPanel session={mockSession} />
-              </AppShell>
-            </div>
-          </SubSection>
-
-          {/* ---- 3. Empty State (No Session Selected) ---- */}
-          <SubSection title="Sidebar + Empty State — No Session" testId="ss-shell-empty">
-            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
-              <AppShell
-                defaultLayout="sidebar-main"
-                navbar={<MockNavbar layoutLabel="sidebar-main" />}
-                sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId={null}
-                    onSelectSession={() => {}}
-                  />
-                }
-                statusBar={<MockStatusBar />}
-              >
-                <MockEmptyMain />
-              </AppShell>
-            </div>
-          </SubSection>
-
-          {/* ---- 4. 3-Panel: Sidebar + Chat + Detail ---- */}
-          <SubSection title="3-Panel — Sidebar + Chat + Detail" testId="ss-shell-three-panel">
-            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
-              <AppShell
-                defaultLayout="sidebar-main-detail"
-                navbar={<MockNavbar layoutLabel="sidebar-main-detail" />}
-                sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-1"
-                    onSelectSession={() => {}}
-                  />
-                }
-                detail={<MockDetailContent />}
-                statusBar={<MockStatusBar />}
-              >
-                <MockChatPanel session={mockSession} />
-              </AppShell>
-            </div>
-          </SubSection>
-
-          {/* ---- 5. Focused Mode (No Sidebar) ---- */}
-          <SubSection title="Focused Mode — Chat Only" testId="ss-shell-focused">
-            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
-              <AppShell
-                defaultLayout="focused"
-                navbar={<MockNavbar layoutLabel="focused" />}
-                sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-1"
-                    onSelectSession={() => {}}
-                  />
-                }
-                statusBar={<MockStatusBar />}
-              >
-                <MockChatPanel session={mockSession} />
-              </AppShell>
-            </div>
-          </SubSection>
-
-          {/* ---- 6. Sidebar Collapsed ---- */}
-          <SubSection title="Sidebar Collapsed" testId="ss-shell-collapsed">
-            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
-              <AppShell
-                defaultLayout="sidebar-main"
-                defaultSidebarCollapsed={true}
-                navbar={<MockNavbar layoutLabel="collapsed sidebar" />}
-                sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-1"
-                    onSelectSession={() => {}}
-                  />
-                }
-                statusBar={<MockStatusBar />}
-              >
-                <MockChatPanel session={mockSession} />
-              </AppShell>
-            </div>
-          </SubSection>
-
-          {/* ---- 7. Empty Sessions (First-Time User) ---- */}
-          <SubSection title="Empty State — No Sessions At All" testId="ss-shell-no-sessions">
-            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
               <AppShell
                 defaultLayout="sidebar-main"
                 navbar={<MockNavbar />}
                 sidebar={
-                  <MockSidebarContent
-                    sessions={[]}
-                    activeSessionId={null}
-                    onSelectSession={() => {}}
-                  />
+                  <MockNavTree expandSessions={true} selectedNode="session:demo-session-1" />
                 }
+                statusBar={<MockStatusBar />}
               >
-                <MockEmptyMain />
+                <MockChatPanel session={mockSession} />
               </AppShell>
             </div>
           </SubSection>
 
-          {/* ---- 8. 3-Panel with Detail Collapsed ---- */}
-          <SubSection title="3-Panel — Detail Collapsed" testId="ss-shell-detail-collapsed">
-            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+          {/* ---- 4. 3-Panel: Nav tree + Chat + Detail ---- */}
+          <SubSection title="3-Panel — Nav Tree + Chat + Context" testId="ss-shell-three-panel">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
               <AppShell
                 defaultLayout="sidebar-main-detail"
-                defaultDetailCollapsed={true}
-                navbar={<MockNavbar layoutLabel="detail collapsed" />}
+                navbar={<MockNavbar />}
                 sidebar={
-                  <MockSidebarContent
-                    sessions={mockSessionSummaries}
-                    activeSessionId="demo-session-1"
-                    onSelectSession={() => {}}
-                  />
+                  <MockNavTree expandSessions={true} selectedNode="session:demo-session-1" />
                 }
                 detail={<MockDetailContent />}
                 statusBar={<MockStatusBar />}
               >
                 <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 5. Focused mode — chat only ---- */}
+          <SubSection title="Focused Mode — Chat Only" testId="ss-shell-focused">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="focused"
+                navbar={<MockNavbar />}
+                sidebar={<MockNavTree />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 6. Collapsed sidebar ---- */}
+          <SubSection title="Collapsed Sidebar" testId="ss-shell-collapsed">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                defaultSidebarCollapsed={true}
+                navbar={<MockNavbar />}
+                sidebar={<MockNavTree />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 7. Skills + MCP expanded in nav tree ---- */}
+          <SubSection title="Nav Tree — Skills + MCP Expanded" testId="ss-shell-skills">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree
+                    expandSessions={false}
+                    expandSkills={true}
+                    expandMcp={true}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockCommandActions />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 8. Empty state — no agents ---- */}
+          <SubSection title="Empty State — No Agents" testId="ss-shell-empty">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={
+                  <ShellNavbar
+                    leading={
+                      <span className="text-sm font-semibold text-foreground">Agent Manager</span>
+                    }
+                    trailing={
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                        <span>Disconnected</span>
+                      </div>
+                    }
+                  />
+                }
+                sidebar={<MockNavTree empty />}
+              >
+                <MockEmptyWelcome />
               </AppShell>
             </div>
           </SubSection>
