@@ -114,6 +114,15 @@ interface PlanComment {
   author: 'human' | 'agent';
   resolvedAt?: string;             // null = open, timestamp = resolved
   createdAt: string;
+
+  // --- Scout agent lifecycle ---
+  scout?: {
+    sessionId: string;             // the scout agent working on this comment
+    status: 'working' | 'done' | 'failed' | 'cancelled';
+    diff?: JsonPatch;              // proposed change (once done)
+    summary?: string;              // what the scout changed and why
+    costUsd?: number;              // what the scout cost
+  };
 }
 ```
 
@@ -121,6 +130,13 @@ This means you can drop a comment on a specific node in a flow graph, on a
 specific screen in a wireframe, on a specific line in a text block — all
 using the same comment model. The "Proposal Button" idea (Part 2, #3) falls
 out naturally: open comments become the agent's revision instructions.
+
+Each comment's `scout` field tracks the background agent working on it.
+The UI shows a small status indicator (spinner / checkmark / error) next to
+the comment. The user can preview the scout's diff before submitting. If the
+scout's suggestion looks wrong, the user can edit the comment (which cancels
+the scout and spawns a new one) or just leave it — the merge agent will
+handle it from scratch.
 
 #### The block editor contract (bidirectional)
 
@@ -155,25 +171,107 @@ The editor knows its own domain. A flow editor emitting `edge_deleted` between
 nodes A and B is reporting a **fact**, not inferring intent. The agent receives
 structured facts and reasons about them. No ambiguous gesture interpretation.
 
-#### The edit → agent loop
+#### The edit → agent loop (speculative execution)
 
-The host collects `BlockEditEvent`s and batches them into an agent prompt:
+The naive loop is: collect edits + comments → batch into prompt → agent
+revises → wait → new plan version. This works but is synchronous — the user
+waits for the agent after every "Submit."
+
+The faster model: **each comment immediately spawns a scout agent**.
 
 ```
-The user made the following changes to the plan:
+┌─────────────────────────────────────────────────────────────────┐
+│  Plan Artifact (live in UI)                                     │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │ Flow Block   │  │ Text Block  │  │ Wireframe   │            │
+│  │              │  │             │  │ Block       │            │
+│  │  💬 ●working │  │ 💬 ✓done   │  │             │            │
+│  │  💬 ✓done   │  │             │  │ 💬 ●working │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+│                              [ Submit All ]                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Phase 1: Comment → scout agent (immediate, parallel)**
+
+Each comment spawns a lightweight scout session that works on a **shadow
+copy** of the plan JSON:
+
+```typescript
+interface CommentScout {
+  commentId: string;
+  sessionId: string;             // scout agent's session
+  shadowPlan: Plan;              // fork of the plan at comment time
+  status: 'working' | 'done' | 'failed' | 'cancelled';
+  diff?: JsonPatch;              // scout's proposed change (once done)
+  summary?: string;              // scout's explanation of what it changed
+}
+```
+
+Scout sessions are cheap:
+- ~100-300ms startup (child process spawn)
+- Budget-capped: `maxBudgetUsd: 0.02-0.05` per scout
+- Scoped prompt: one comment, one concern, against the full plan context
+- No worktree needed — scouts operate on plan JSON, not code
+
+The scout's job is narrow: "Given this plan and this comment anchored to
+element X, produce the minimal JSON patch that addresses the comment."
+If the user deletes a comment before submitting, the scout is terminated
+(`SIGINT`).
+
+**Phase 2: Submit → merge agent (batched, informed)**
+
+Hitting "Submit" spawns a merge agent with a rich prompt:
+
+```
+Current plan: <full plan JSON>
+
+The user provided the following feedback:
+
+Comment 1: [flow block "User Journey", node "Login"]
+  "Add MFA challenge before Dashboard"
+  Scout result: ✓ done
+  Scout diff: <JSON patch adding MFA node + edges>
+  Scout summary: "Added MFA Challenge node between Login and Dashboard
+                  with conditional edge for SSO bypass"
+
+Comment 2: [wireframe block "Login Screen", element "password-field"]
+  "Add show/hide password toggle"
+  Scout result: ● still working
+  (no diff available yet)
+
+Comment 3: [text block "Security Requirements"]
+  "This should mention OWASP compliance"
+  Scout result: ✓ done
+  Scout diff: <JSON patch adding OWASP section>
+  Scout summary: "Added OWASP Top 10 compliance checklist as subsection"
+
+User edits (direct):
 - [flow block "User Journey"] Deleted edge between "Login" and "Dashboard"
-- [flow block "User Journey"] Added node "MFA Challenge" between "Login" and "Dashboard"
-- [wireframe block "Login Screen"] Moved "Remember Me" checkbox below password field
 
-Open comments:
-- [flow block "User Journey", node "MFA Challenge"] "Should this be optional for SSO users?"
-
-Update the plan to reflect these changes.
+Apply all feedback. Scout diffs are suggestions — verify they're consistent
+with each other and with the direct edits. Consider cross-cutting impact:
+does the MFA addition affect the wireframe? Does the security update
+affect the flow?
 ```
 
-The agent then produces a new plan version (new JSON), which the host diffs
-against the current version and hot-swaps. This is Flowy's iteration loop,
-but generalized across block types.
+The merge agent's advantages over the naive batch approach:
+- **Pre-computed suggestions**: done scouts provide diffs that can be applied
+  directly if consistent, saving the agent from reasoning from scratch
+- **Cross-cutting analysis**: the merge agent sees ALL comments together and
+  can identify interactions (MFA comment affects both the flow block and the
+  wireframe block)
+- **Graceful degradation**: if a scout isn't done yet, the merge agent just
+  handles that comment from scratch — no blocking on the slowest scout
+
+**Why this isn't "multi-agent document editing" (the thing we said to avoid):**
+
+The scouts never see each other. They don't coordinate. They each produce an
+independent diff against a frozen snapshot. The merge agent is the single
+authority that reconciles everything. This is speculative execution with a
+single sequencing point, not concurrent editing with conflict resolution.
 
 #### The registry
 
@@ -367,14 +465,17 @@ Ranked by value-to-effort ratio:
 - Enables wireframes, ER diagrams, etc. without core changes
 - The unified artifact is the real win — one plan file, multiple visual facets
 
-### 2. Native comment system anchored to plan elements (High value, medium effort)
+### 2. Native comment system with scout agents (High value, medium-high effort)
 
 - `PlanComment` as a core primitive on the plan, not per-block
 - Comments anchor to a block + optional element within (node, line, screen)
 - Each block editor receives its comments and renders contextual anchors
-- Open comments feed directly into agent revision prompts
-- Comments persist across plan revisions (re-anchor by element ID)
-- Replaces the need for a separate chat-based feedback loop on plans
+- **Each comment immediately spawns a scout agent** on a shadow copy
+- Scout produces a diff + summary; status shown inline on the comment
+- Multiple scouts run in parallel — cheap sessions, budget-capped
+- "Submit" spawns a merge agent with all comments + scout diffs + user edits
+- Merge agent has pre-computed suggestions → faster, more consistent results
+- Scouts that aren't done yet degrade gracefully (merge handles from scratch)
 
 ### 3. Plan versioning with comparison (Medium value, low effort)
 
@@ -397,9 +498,14 @@ Ranked by value-to-effort ratio:
    ("edge deleted"), never intent ("user wants simpler flow"). The agent
    reasons about intent from facts + comments together.
 
-2. **Multi-agent document editing.** Multiple agents on one document creates
-   coordination hell. Use the existing multi-session + worktree pattern for
-   parallel agent work.
+2. **Multi-agent concurrent editing (unbounded).** Multiple agents writing
+   to the same live document with coordination protocols is still dangerous.
+   The scout pattern is safe because scouts are **read-fork-write-once**: each
+   scout forks from a frozen snapshot, writes one diff, and never sees other
+   scouts. The merge agent is the single authority. This is speculative
+   execution, not concurrent editing. The key invariant: **scouts never
+   communicate with each other, and only the merge agent writes to the live
+   plan.**
 
 3. **Building a full block/document editor (Notion clone).** The plan is a
    structured artifact with typed blocks, not a freeform document. Users
@@ -419,6 +525,7 @@ Ranked by value-to-effort ratio:
 | Lofi wireframe rendering | Flowy | Yes (as extension) | No | Extension editor, not core — plan schema supports it |
 | Edits → structured events | Part 2, #1 | Yes (reframed) | No | Core of `BlockEditEvent` contract — facts not intent |
 | Multi-agent chapters | Part 2, #2 | Partial | Yes (WorkflowPhase) | Already covered by workflow plugins |
-| Contextual pin comments | Part 2, #3 | Yes | No | Absorbed into core `PlanComment` system |
+| Contextual pin comments | Part 2, #3 | Yes | No | Core `PlanComment` system + scout agents per comment |
 | Notebook blocks | Part 2, #4 | Partial | Yes (ResearchDocContract) | Block editors are the typed version of this |
+| Speculative scout agents | New | Yes | Partial (multi-session infra exists) | Scout per comment + merge agent on submit |
 | Time-travel slider | Part 2, #5 | Yes | Yes (event-sourcing planned) | Implement as plan version nav |
