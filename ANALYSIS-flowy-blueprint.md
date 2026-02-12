@@ -115,6 +115,10 @@ interface PlanComment {
   resolvedAt?: string;             // null = open, timestamp = resolved
   createdAt: string;
 
+  // --- Threading (for context-dependent comments) ---
+  threadId?: string;               // groups related comments into a thread
+  parentCommentId?: string;        // which comment this replies to
+
   // --- Scout agent lifecycle ---
   scout?: {
     sessionId: string;             // the scout agent working on this comment
@@ -272,6 +276,185 @@ The scouts never see each other. They don't coordinate. They each produce an
 independent diff against a frozen snapshot. The merge agent is the single
 authority that reconciles everything. This is speculative execution with a
 single sequencing point, not concurrent editing with conflict resolution.
+
+#### Open design questions
+
+**Q1: How do merge conflicts between scout diffs get resolved?**
+
+They don't — because scout diffs are never mechanically applied.
+
+The tempting design is: collect scout patches → compose them → apply. But
+JSON Patch composition is fragile (path indices shift, operations interact)
+and you'd need a conflict resolution layer on top. That's reimplementing
+git merge for JSON, which is a project unto itself.
+
+Instead: **scout diffs are context, not instructions.** The merge agent
+reads them as "here's what one agent thought the change should look like"
+and produces a single new plan version from scratch. The scout diffs
+accelerate the merge agent's reasoning (it doesn't have to figure out how
+to add an MFA node — it can see the scout already did that), but the merge
+agent is free to deviate from any scout's suggestion.
+
+This means the merge prompt frames diffs explicitly as suggestions:
+
+```
+Scout diff for comment 1 (suggestion, may need adjustment):
+  <JSON patch>
+  Summary: "Added MFA node between Login and Dashboard"
+
+Scout diff for comment 3 (suggestion, may need adjustment):
+  <JSON patch>
+  Summary: "Added OWASP checklist to Security Requirements"
+
+NOTE: Scout diffs were produced independently against the same base
+snapshot. They may overlap or contradict. Use them as starting points,
+not as final answers. Produce a single consistent plan that addresses
+all comments.
+```
+
+The merge agent then outputs the complete revised plan (not a patch). The
+host diffs the new plan against the old one for the version history.
+
+**What this costs:** the merge agent does slightly more work than pure patch
+application. But it gains correctness (no broken patch composition) and
+cross-cutting awareness (it can notice that two scout diffs both add an
+"MFA" node and deduplicate).
+
+**Q2: How to make merging feel fast but still be thorough?**
+
+Two-phase merge with progressive rendering:
+
+**Phase A — Mechanical apply (instant, <100ms):**
+
+For scout diffs that touch isolated blocks (no cross-block dependencies),
+apply the JSON patch directly and show the result immediately. The UI marks
+these blocks with a subtle "provisional" indicator (e.g., a thin colored
+border or a small badge). No agent involved — this is pure JSON patching.
+
+Detection rule: a scout diff is "isolated" if:
+- It only touches paths within its own block (`/blocks/{i}/payload/...`)
+- No other scout diff touches the same block
+- No user edit touches the same block
+
+These conditions are checkable in O(n) by scanning the patch paths.
+
+**Phase B — Agent reconciliation (streaming, 2-10s):**
+
+The merge agent runs simultaneously and streams its output block-by-block.
+As each block's revision arrives:
+- If it matches the mechanical result → remove the "provisional" indicator
+  (confirms the optimistic apply was correct)
+- If it differs → hot-swap the block with an animated transition (the user
+  sees the correction happen live)
+- For blocks that had no mechanical result (conflicting diffs, cross-cutting
+  concerns) → the agent's output appears fresh
+
+```
+Timeline:
+  t=0ms     User hits Submit
+  t=50ms    Isolated scout diffs applied mechanically (3 of 5 blocks update)
+  t=200ms   Merge agent session starts
+  t=2s      Agent streams first block → confirms or corrects block 1
+  t=4s      Agent streams block 2 → corrects block 2 (had cross-cutting issue)
+  t=6s      Agent streams remaining blocks
+  t=7s      All provisional indicators removed, plan is final
+```
+
+The user sees ~60% of changes instantly, and the rest stream in over a few
+seconds. The "provisional" concept sets the right expectation: "this is
+probably right but the agent is double-checking."
+
+**Phase B fallback:** If the merge agent's output is identical to the
+mechanical result for all blocks, Phase B completes silently (the
+provisional indicators just disappear). The user perceives the merge as
+instant. This is the common case when comments are independent.
+
+**Q3: How to handle context-dependent comments ("here too")?**
+
+The problem: comment 2 says "here too" anchored to a different block. Its
+scout can't make sense of it without comment 1 ("replace X with Y"). Three
+possible approaches, with the recommended one last:
+
+**Approach A — Scout asks for clarification:**
+The scout recognizes insufficient context and asks the user. Bad: this
+breaks the async model. The user is now fielding questions from background
+agents while trying to add more comments. Interaction overhead scales with
+comment count.
+
+**Approach B — Dependency detection + scout handoff:**
+Detect that "here too" depends on a prior comment and either merge them into
+one scout or make scout 2 wait for scout 1's result. Problem: dependency
+detection between natural language comments is itself an LLM inference step.
+You'd need to run a classifier on every comment pair — O(n²) calls, each
+with its own latency. For 10 comments that's 45 classification calls before
+any scout starts. Defeats the purpose of being fast.
+
+**Approach C (recommended) — Comment threading + thread-scoped scouts:**
+
+Don't detect dependencies — let the user declare them through **threading**.
+Comments that are replies to other comments form a thread. The scout for a
+threaded comment receives the full thread as context, not just its own text.
+
+```typescript
+interface PlanComment {
+  id: string;
+  blockId: string;
+  anchor?: string;
+  content: string;
+  author: 'human' | 'agent';
+  resolvedAt?: string;
+  createdAt: string;
+  threadId?: string;               // groups related comments
+  parentCommentId?: string;        // which comment this replies to
+
+  scout?: {
+    sessionId: string;
+    status: 'working' | 'done' | 'failed' | 'cancelled';
+    diff?: JsonPatch;
+    summary?: string;
+    costUsd?: number;
+  };
+}
+```
+
+Threading rules:
+- A standalone comment (no `parentCommentId`) spawns its own scout
+  immediately
+- A reply (has `parentCommentId`) **joins the parent's thread**. The scout
+  for the reply receives the full thread (all ancestor comments + their
+  anchors) as context
+- If the parent's scout is still working when the reply arrives, the reply's
+  scout starts anyway with the parent's *text* as context (not its diff,
+  which isn't ready yet)
+- If the parent's scout is done, the reply's scout also gets the parent's
+  diff + summary
+
+The UX for this is lightweight: when the user clicks an existing comment's
+reply button (or adds a comment to the same anchor), it's a thread. When
+they click a fresh element, it's standalone. No extra UI needed — reply
+affordance is standard.
+
+The "here too" scenario then works:
+
+```
+Comment 1: [flow block, node "Login"] "Replace the basic auth check with OAuth2"
+  → Scout 1 starts with: plan + this comment
+
+Comment 2: [flow block, node "Signup"] "here too" (reply to comment 1)
+  → Scout 2 starts with: plan + comment 1 text + comment 2 text + both anchors
+  → Scout 2 prompt: "Thread context: user first asked to replace basic auth
+    with OAuth2 on node Login. They now say 'here too' on node Signup.
+    Apply the same pattern."
+```
+
+**Fallback for genuinely ambiguous standalone comments:**
+If a scout encounters a standalone comment it can't make sense of (e.g.,
+"same as before" with no thread parent and no prior context), the scout
+should produce a `status: 'failed'` with a `summary` explaining what it
+couldn't resolve. The UI shows this as a warning on the comment. The merge
+agent handles it with full context (all comments visible). This is graceful
+degradation — the scout doesn't block anything, it just couldn't pre-compute
+a suggestion for this one.
 
 #### The registry
 
