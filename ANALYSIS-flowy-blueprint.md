@@ -67,10 +67,12 @@ visually verifiable before committing to implementation**.
 
 ### Concrete takeaway
 
-Design the plan artifact as a **multi-block document** where each block has
-a type and a typed payload. The core ships renderers for common types (flow
-graphs, text). Extensions register renderers for additional types (wireframes,
-ER diagrams, etc.).
+Design the plan artifact as a **multi-block document** with interactive,
+bidirectional block editors. The core provides two things every block gets
+for free: **commenting** (anchored to any element) and a **structured edit
+protocol** (editors emit change events, the host routes them to the agent).
+
+#### The plan artifact
 
 ```typescript
 // Current PlanStep — flat, text-only
@@ -84,42 +86,111 @@ interface PlanBlock {
   payload: unknown;                // typed per block type
 }
 
-// Flow block payload (core renderer via @xyflow/react)
-interface FlowBlockPayload {
-  nodes: { id: string; label: string; status?: string }[];
-  edges: { source: string; target: string; label?: string }[];
-}
-
-// Wireframe block payload (extension renderer)
-interface WireframeBlockPayload {
-  screens: { id: string; name: string; elements: WireframeElement[] }[];
-}
-
 // The plan itself
 interface Plan {
   id: string;
   issueId: string;
   blocks: PlanBlock[];             // ordered, multi-modal
+  comments: PlanComment[];         // core concern — lives on the plan, not per-block
   complexity: 'trivial' | 'simple' | 'moderate' | 'complex';
   risks: string[];
   createdAt: string;
 }
 ```
 
-The block renderer registry is the extension point:
+#### Core: the comment system
+
+Comments are a **host-level primitive**, not something each editor rebuilds.
+The host manages the comment store; each block editor receives its relevant
+comments and renders anchors contextually (a pin on a flow node, a margin
+note on a text block, a callout on a wireframe element).
 
 ```typescript
-// Core registers built-in renderers
-registerPlanBlockRenderer('flow', FlowBlockRenderer);    // @xyflow/react
-registerPlanBlockRenderer('text', TextBlockRenderer);    // markdown
-
-// Extensions register additional renderers
-registerPlanBlockRenderer('wireframe', WireframeBlockRenderer);  // TLDraw, etc.
-registerPlanBlockRenderer('er_diagram', ERDiagramBlockRenderer);
+interface PlanComment {
+  id: string;
+  blockId: string;                 // which block
+  anchor?: string;                 // element within the block (node id, line number, element id)
+  content: string;                 // the comment text
+  author: 'human' | 'agent';
+  resolvedAt?: string;             // null = open, timestamp = resolved
+  createdAt: string;
+}
 ```
 
-Unknown block types fall back to a raw JSON viewer. This keeps the core lean
-while making the plan artifact genuinely multi-modal.
+This means you can drop a comment on a specific node in a flow graph, on a
+specific screen in a wireframe, on a specific line in a text block — all
+using the same comment model. The "Proposal Button" idea (Part 2, #3) falls
+out naturally: open comments become the agent's revision instructions.
+
+#### The block editor contract (bidirectional)
+
+Block extensions are **editors, not renderers**. Each editor receives its
+payload and comments, and emits two kinds of events back to the host:
+
+```typescript
+interface PlanBlockEditorProps {
+  block: PlanBlock;
+  readOnly?: boolean;
+
+  // --- Host → Editor (data down) ---
+  comments: PlanComment[];         // comments anchored to this block
+
+  // --- Editor → Host (events up) ---
+  onEdit: (event: BlockEditEvent) => void;
+  onComment: (anchor: string | undefined, content: string) => void;
+}
+
+// Structured edit events — facts, not inferred intent
+interface BlockEditEvent {
+  blockId: string;
+  action: string;                  // domain-specific: 'node_added', 'edge_deleted',
+                                   // 'element_moved', 'text_changed', etc.
+  description: string;             // human-readable: "Deleted edge between Login and Dashboard"
+  patch: JsonPatch;                // RFC 6902 — the actual payload mutation
+}
+```
+
+**Why this works where the "Intent-Based Editor" (Idea #1) doesn't:**
+The editor knows its own domain. A flow editor emitting `edge_deleted` between
+nodes A and B is reporting a **fact**, not inferring intent. The agent receives
+structured facts and reasons about them. No ambiguous gesture interpretation.
+
+#### The edit → agent loop
+
+The host collects `BlockEditEvent`s and batches them into an agent prompt:
+
+```
+The user made the following changes to the plan:
+- [flow block "User Journey"] Deleted edge between "Login" and "Dashboard"
+- [flow block "User Journey"] Added node "MFA Challenge" between "Login" and "Dashboard"
+- [wireframe block "Login Screen"] Moved "Remember Me" checkbox below password field
+
+Open comments:
+- [flow block "User Journey", node "MFA Challenge"] "Should this be optional for SSO users?"
+
+Update the plan to reflect these changes.
+```
+
+The agent then produces a new plan version (new JSON), which the host diffs
+against the current version and hot-swaps. This is Flowy's iteration loop,
+but generalized across block types.
+
+#### The registry
+
+```typescript
+// Core registers built-in editors
+registerPlanBlockEditor('flow', FlowBlockEditor);        // @xyflow/react
+registerPlanBlockEditor('text', TextBlockEditor);        // markdown + inline comments
+
+// Extensions register additional editors
+registerPlanBlockEditor('wireframe', WireframeBlockEditor);  // TLDraw, etc.
+registerPlanBlockEditor('er_diagram', ERDiagramBlockEditor);
+```
+
+Unknown block types fall back to a raw JSON viewer with comment support
+(comments still work — they just anchor to the block, not to elements within
+it). This keeps the core lean while making the plan artifact genuinely
+interactive and multi-modal.
 
 ---
 
@@ -130,30 +201,34 @@ while making the plan artifact genuinely multi-modal.
 **The claim:** Dragging a UI element generates a semantic action log. The
 agent consumes the log and rewrites the spec.
 
-**Criticism:**
+**Criticism of the original framing:**
 
-- This conflates two problems: visual editing and agent prompting. The
-  indirection (drag → action log → agent reasoning → JSON rewrite → re-render)
-  is a Rube Goldberg machine for what could be a direct edit. If the user
-  knows they want the login button in the sidebar, they can just tell the
-  agent. The drag gesture adds a translation layer that the agent then has to
-  reverse-translate.
+- The original Idea #1 asks the agent to *infer intent* from spatial gestures
+  ("user moved button, therefore they want login to be less prominent"). That
+  inference step is unreliable and should be avoided.
 
-- The "agent infers intent from action" step is where this breaks. Moving a
-  button from header to sidebar doesn't reliably mean "make login less
-  prominent." It might mean "the sidebar has more space" or "our designer
-  said so." Intent inference from spatial manipulation is an unsolved UX
-  research problem, not a feature you can ship.
+**What's actually valuable — reframed as the block editor contract:**
 
-- Agent-manager's contract system already provides the right abstraction.
-  The `ResearchDocContract` is the spec. The agent edits it through the
-  session. The human reviews via the `ResearchDocViewer`. Adding a visual
-  drag layer on top of this adds complexity without clear value.
+- If you scope this down to **editors emit structured facts, not inferred
+  intent**, the core mechanic is sound. A flow editor emitting "edge deleted
+  between A and B" is a fact. A wireframe editor emitting "button moved from
+  header to sidebar" is a fact. The agent receives facts and reasons about
+  them — that's what agents are good at.
 
-**Verdict:** Not relevant. The problem it solves (making agent specs editable)
-is already handled by the ResearchDocContract + inline editing. The spatial
-manipulation → intent inference step is an unsolved research problem that
-would eat significant development time for unreliable results.
+- The key design rule: **the editor describes what changed, never why.** The
+  "why" comes from the human via comments, or the agent infers it from the
+  full context of all changes + open comments together. No single gesture
+  carries intent.
+
+- This is formalized in the `BlockEditEvent` contract (see Part 1 concrete
+  takeaway). Each editor emits `{ action, description, patch }` — a
+  domain-specific action name, a human-readable description, and the actual
+  JSON patch. The host batches these into agent prompts.
+
+**Verdict:** The original "intent inference from gestures" framing is still
+wrong. But the underlying mechanic — **visual edits produce structured change
+events that feed agent prompts** — is the right interaction model. It's the
+foundation of the bidirectional block editor contract.
 
 ### Idea 2: "Council of Chapters" (Sub-Agents per Section)
 
@@ -198,39 +273,27 @@ context trying to negotiate.
 **The claim:** Click an element in a rendered mockup, drop a comment, hit
 "Revise" — the agent updates just that section.
 
-**Criticism:**
+**Revised assessment:** This idea is now **absorbed into the core plan
+architecture** rather than being a separate feature. The `PlanComment` model
+with block + anchor targeting (see Part 1 concrete takeaway) is exactly this:
+click any element in any block editor, drop a comment, and those comments
+become the agent's revision instructions.
 
-- This is the most practically useful idea in the document, but it's
-  **already how agent-manager's chat interaction works**, just with text
-  instead of spatial pins. The user sees the agent's output, provides feedback
-  in the session, and the agent revises. The "proposal" framing doesn't
-  change the underlying loop.
+The original criticism that "the chat already does this" was too dismissive.
+Spatially-anchored comments are fundamentally better than chat for plan
+review because:
 
-- The spatial annotation part (click on a specific rendered element) is
-  interesting but only makes sense for visual outputs. Agent-manager deals
-  primarily with code, plans, and structured data — not rendered UIs. For
-  code, the equivalent is "click on a line in the diff view and comment" which
-  is what GitHub PRs already do, and what the verification pipeline's AI
-  review step could surface.
+- They survive across agent turns (a comment on node X stays there even as
+  the surrounding plan evolves)
+- They can be resolved/reopened, giving the agent clear signal on what's done
+  vs. what still needs attention
+- They carry context automatically (the anchor identifies what the comment
+  is about without the human having to describe it)
 
-- The "no chat window" framing is a false dichotomy. The chat is the
-  feedback channel. Replacing it with contextual pins doesn't eliminate
-  the chat — it distributes it spatially, which is harder to follow for
-  multi-turn interactions.
+The "Revise" button is just: collect all open comments + pending edits →
+format as agent prompt → agent produces new plan version.
 
-**What's actually extractable:** The concept of **contextual feedback on
-rendered plan artifacts**. If a plan is rendered as a flow graph
-(see Part 1 takeaway), allowing the user to click a specific node and say
-"this step is wrong" — then passing that node context to the agent — is a
-useful interaction pattern. This maps to:
-
-1. Render plan as flow graph (PlanFlowView component)
-2. Node click → opens contextual input
-3. Input + node context → new agent prompt
-4. Agent revises plan JSON → re-render
-
-This is a UI feature on top of the existing session/chat system, not a new
-architecture.
+**Verdict:** Absorbed into the core comment system. Not a separate feature.
 
 ### Idea 4: "Multimodal Living Blocks" (Notebook-Style Layout)
 
@@ -294,21 +357,24 @@ architecture. No new systems needed.
 
 Ranked by value-to-effort ratio:
 
-### 1. Multi-block plan artifacts with pluggable renderers (High value, medium effort)
+### 1. Interactive multi-block plan artifacts (High value, medium-high effort)
 
-- Redesign `Plan` from flat step list to ordered block array
+- Redesign `Plan` from flat step list to ordered `PlanBlock[]`
 - Each block has a `type` + typed `payload`
-- Core ships `flow` renderer (`@xyflow/react`) and `text` renderer (markdown)
-- Extension point: `registerPlanBlockRenderer(type, component)`
+- Block editors are **bidirectional**: render payload, emit `BlockEditEvent`s
+- Core ships `flow` editor (`@xyflow/react`) and `text` editor (markdown)
+- Extension point: `registerPlanBlockEditor(type, component)`
 - Enables wireframes, ER diagrams, etc. without core changes
 - The unified artifact is the real win — one plan file, multiple visual facets
 
-### 2. Contextual feedback on rendered artifacts (Medium value, medium effort)
+### 2. Native comment system anchored to plan elements (High value, medium effort)
 
-- When viewing a rendered plan/flow, allow clicking a node to provide
-  targeted feedback
-- Pass node context + user comment as a new prompt to the agent session
-- Natural extension of the existing session interaction model
+- `PlanComment` as a core primitive on the plan, not per-block
+- Comments anchor to a block + optional element within (node, line, screen)
+- Each block editor receives its comments and renders contextual anchors
+- Open comments feed directly into agent revision prompts
+- Comments persist across plan revisions (re-anchor by element ID)
+- Replaces the need for a separate chat-based feedback loop on plans
 
 ### 3. Plan versioning with comparison (Medium value, low effort)
 
@@ -327,22 +393,20 @@ Ranked by value-to-effort ratio:
 
 ## What to Explicitly Avoid
 
-1. **Building a visual drag-and-drop plan editor.** The agent edits the plan.
-   The human reviews and comments. Adding a visual editor creates a parallel
-   editing path that the agent then has to reconcile with.
+1. **Intent inference from spatial manipulation.** Editors emit facts
+   ("edge deleted"), never intent ("user wants simpler flow"). The agent
+   reasons about intent from facts + comments together.
 
 2. **Multi-agent document editing.** Multiple agents on one document creates
    coordination hell. Use the existing multi-session + worktree pattern for
    parallel agent work.
 
-3. **Block editor / Notion clone.** Enormous implementation effort for a
-   feature that's tangential to agent orchestration. Render artifacts
-   read-only with annotation capability.
+3. **Building a full block/document editor (Notion clone).** The plan is a
+   structured artifact with typed blocks, not a freeform document. Users
+   interact through block editors and comments, not by restructuring the
+   document itself. Keep the block *structure* agent-controlled.
 
-4. **Intent inference from spatial manipulation.** Unsolved research problem.
-   Don't try to guess what a drag gesture "means."
-
-5. **Building wireframe renderers in core.** The plan artifact should *support*
+4. **Building wireframe renderers in core.** The plan artifact *supports*
    wireframe blocks, but the renderer is an extension, not a core feature.
 
 ---
@@ -351,10 +415,10 @@ Ranked by value-to-effort ratio:
 
 | Idea | Source | Relevant? | Already Exists? | Action |
 |------|--------|-----------|-----------------|--------|
-| Multi-modal plan artifact | Flowy | Yes | Partial (Plan schema + React Flow in deps) | Redesign Plan as block array + renderer registry |
-| Lofi wireframe rendering | Flowy | Yes (as extension) | No | Extension renderer, not core — plan schema supports it |
-| Intent-based drag editor | Part 2, #1 | No | N/A | Avoid |
+| Multi-modal plan artifact | Flowy | Yes | Partial (Plan schema + React Flow in deps) | Redesign Plan as block array + bidirectional editor registry |
+| Lofi wireframe rendering | Flowy | Yes (as extension) | No | Extension editor, not core — plan schema supports it |
+| Edits → structured events | Part 2, #1 | Yes (reframed) | No | Core of `BlockEditEvent` contract — facts not intent |
 | Multi-agent chapters | Part 2, #2 | Partial | Yes (WorkflowPhase) | Already covered by workflow plugins |
-| Contextual pin comments | Part 2, #3 | Yes | Partial (session chat exists) | Build as UI feature on plan renderer |
-| Notebook blocks | Part 2, #4 | Partial | Yes (ResearchDocContract) | Don't build editor; enhance viewer |
+| Contextual pin comments | Part 2, #3 | Yes | No | Absorbed into core `PlanComment` system |
+| Notebook blocks | Part 2, #4 | Partial | Yes (ResearchDocContract) | Block editors are the typed version of this |
 | Time-travel slider | Part 2, #5 | Yes | Yes (event-sourcing planned) | Implement as plan version nav |
