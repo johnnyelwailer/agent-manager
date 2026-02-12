@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute, redirect, Outlet, Link } from '@tanstack/react-router';
+import { createRouter, createRoute, createRootRoute, redirect, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useConnectionStore } from './stores/connection.js';
 import { useSessionsStore } from './stores/sessions.js';
@@ -32,33 +32,16 @@ const rootRoute = createRootRoute({
       return unsub;
     }, [onEvent, handleEvent]);
 
-    const navItems = [
-      { to: '/ops' as const, label: 'Ops' },
-      { to: '/sessions' as const, label: 'Sessions' },
-      { to: '/settings' as const, label: 'Settings' },
-      { to: '/snapshots' as const, label: 'Snapshots' },
-    ];
-
     return (
       <div className="flex h-screen flex-col bg-background">
         <ShellNavbar
           leading={
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-semibold text-foreground">Agent Manager</span>
-              <div className={cn('ml-2 h-2 w-2 rounded-full', connected ? 'bg-green-500' : 'bg-red-500')} />
-            </div>
+            <span className="text-sm font-semibold text-foreground">Agent Manager</span>
           }
           trailing={
-            <div className="flex items-center gap-1">
-              {navItems.map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&.active]:bg-accent [&.active]:text-accent-foreground"
-                >
-                  {label}
-                </Link>
-              ))}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className={cn('h-2 w-2 rounded-full', connected ? 'bg-green-500' : 'bg-red-500')} />
+              <span>{connected ? 'Connected' : 'Disconnected'}</span>
             </div>
           }
         />
@@ -161,8 +144,6 @@ const sessionsRoute = createRoute({
                   <span>{session.adapterId}</span>
                   <span>&middot;</span>
                   <span>{session.status}</span>
-                  <span>&middot;</span>
-                  <span>${session.costUsd.toFixed(4)}</span>
                   <span>&middot;</span>
                   <span>{session.eventCount} events</span>
                 </div>

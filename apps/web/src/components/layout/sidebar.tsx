@@ -55,7 +55,7 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, connected,
               <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', statusColors[session.status] ?? 'bg-muted-foreground')} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-medium">{session.prompt}</div>
-                <div className="text-xs text-muted-foreground">${session.costUsd.toFixed(4)}</div>
+                <div className="text-xs text-muted-foreground">{session.adapterId}</div>
               </div>
             </button>
           ))}

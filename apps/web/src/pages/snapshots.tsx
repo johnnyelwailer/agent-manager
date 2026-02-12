@@ -451,11 +451,18 @@ const mockAdapterSkills = [
   { id: 'refactor', cmd: '/refactor', label: 'Refactor code' },
 ];
 
+// Adapter-provided workflows (multi-phase operations)
+const mockWorkflows = [
+  { id: 'wf-1', name: 'Implement auth flow', phase: 'execute' as const, progress: 65, status: 'running' },
+  { id: 'wf-2', name: 'Fix CSS layout overflow', phase: 'verify' as const, progress: 100, status: 'completed' },
+];
+
 const claudeSessions = mockSessionSummaries.filter((s) => s.adapterId === 'claude-code');
 const aiderSessions = mockSessionSummaries.filter((s) => s.adapterId === 'aider');
 
 interface NavTreeConfig {
   expandSessions?: boolean;
+  expandWorkflows?: boolean;
   expandSkills?: boolean;
   expandMcp?: boolean;
   expandAider?: boolean;
@@ -466,6 +473,7 @@ interface NavTreeConfig {
 
 function MockNavTree({
   expandSessions = true,
+  expandWorkflows = false,
   expandSkills = false,
   expandMcp = false,
   expandAider = false,
@@ -511,6 +519,25 @@ function MockNavTree({
                 dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
                 label={s.prompt}
                 selected={selectedNode === `session:${s.sessionId}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandWorkflows}
+            label="Workflows"
+            badge={expandWorkflows ? undefined : String(mockWorkflows.length)}
+          />
+          {expandWorkflows &&
+            mockWorkflows.map((wf) => (
+              <TreeRow
+                key={wf.id}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[wf.status] ?? 'bg-muted-foreground'}
+                label={`${wf.name} \u2014 ${wf.phase}`}
+                badge={`${wf.progress}%`}
+                selected={selectedNode === `workflow:${wf.id}`}
               />
             ))}
 
@@ -606,47 +633,89 @@ function MockNavTree({
 // ---------------------------------------------------------------------------
 
 function MockCommandActions() {
-  const actions = [
-    { id: 'plan', cmd: '/plan', description: 'Design an implementation strategy for a feature' },
-    { id: 'review', cmd: '/review', description: 'Review and analyze recent code changes' },
-    { id: 'commit', cmd: '/commit', description: 'Stage changes and create a commit' },
-    { id: 'debug', cmd: '/debug', description: 'Investigate and fix a failing test or bug' },
-    { id: 'test', cmd: '/test', description: 'Write or run test suites' },
-    { id: 'refactor', cmd: '/refactor', description: 'Restructure code for clarity or performance' },
+  const workflows = [
+    {
+      id: 'plan-build',
+      name: 'Plan & Build',
+      description: 'Design the approach, implement changes, verify correctness',
+      phases: ['plan', 'execute', 'verify'],
+    },
+    {
+      id: 'code-review',
+      name: 'Code Review',
+      description: 'Analyze changes, suggest improvements, apply fixes',
+      phases: ['plan', 'execute', 'verify'],
+    },
+    {
+      id: 'debug-fix',
+      name: 'Debug & Fix',
+      description: 'Investigate the issue, create a fix, run tests',
+      phases: ['plan', 'execute', 'verify'],
+    },
   ];
+
+  const quickCommands = ['/commit', '/test', '/refactor', '/review'];
 
   const contextHints = [
     { text: 'feature/auth has 5 uncommitted files', status: 'warning' as const },
     { text: 'postgres MCP server: connection refused', status: 'error' as const },
-    { text: '1 session currently running', status: 'info' as const },
+    { text: 'Implement auth flow \u2014 execute phase (65%)', status: 'info' as const },
   ];
 
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="w-full max-w-lg space-y-6">
-        {/* Provider badge */}
+        {/* Provider */}
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-green-500" />
           <span className="text-xs font-medium text-muted-foreground">claude-code</span>
         </div>
 
-        {/* Actions grid */}
+        {/* Adapter workflows */}
         <div>
-          <h2 className="text-sm font-medium text-foreground">Suggested Actions</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {actions.map((action) => (
+          <h2 className="text-sm font-medium text-foreground">Workflows</h2>
+          <div className="mt-3 space-y-2">
+            {workflows.map((wf) => (
               <div
-                key={action.id}
-                className="flex flex-col rounded-lg border border-border px-3 py-2.5"
+                key={wf.id}
+                className="rounded-lg border border-border px-3 py-2.5"
               >
-                <span className="text-sm font-medium text-foreground">{action.cmd}</span>
-                <span className="mt-0.5 text-xs text-muted-foreground">{action.description}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">{wf.name}</span>
+                  <div className="flex items-center gap-1">
+                    {wf.phases.map((phase, i) => (
+                      <div
+                        key={phase}
+                        className={cn(
+                          'h-1.5 rounded-full',
+                          i === 0 ? 'w-4 bg-foreground/20' : 'w-3 bg-foreground/10',
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <span className="mt-0.5 text-xs text-muted-foreground">{wf.description}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Context hints */}
+        {/* Quick commands */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Quick Commands</h2>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {quickCommands.map((cmd) => (
+              <span
+                key={cmd}
+                className="rounded-md border border-border px-2.5 py-1 text-xs font-mono text-foreground/80"
+              >
+                {cmd}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Context */}
         <div>
           <h2 className="text-sm font-medium text-foreground">Context</h2>
           <div className="mt-2 space-y-1.5">
@@ -689,14 +758,59 @@ function MockCommandActions() {
 // ---------------------------------------------------------------------------
 
 function MockDetailContent() {
+  const phases = [
+    { id: 'plan', label: 'Plan', status: 'completed' as const },
+    { id: 'execute', label: 'Execute', status: 'running' as const },
+    { id: 'verify', label: 'Verify', status: 'pending' as const },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Session Context</h2>
+        <h2 className="text-sm font-semibold text-foreground">Workflow Context</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Workflow phase progress */}
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</h3>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Implement Auth Flow
+          </h3>
+          <div className="mt-2 space-y-1.5">
+            {phases.map((phase) => (
+              <div key={phase.id} className="flex items-center gap-2 text-xs">
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    phase.status === 'completed'
+                      ? 'bg-green-500'
+                      : phase.status === 'running'
+                        ? 'bg-blue-500 animate-pulse'
+                        : 'bg-muted-foreground/30',
+                  )}
+                />
+                <span
+                  className={cn(
+                    phase.status === 'running'
+                      ? 'font-medium text-foreground'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {phase.label}
+                </span>
+                {phase.status === 'running' && (
+                  <span className="ml-auto text-[10px] text-muted-foreground">65%</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <Separator />
+
+        {/* Tasks in current phase */}
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Tasks
+          </h3>
           <div className="mt-2 space-y-2">
             {mockTasks.slice(0, 2).map((task) => (
               <TaskCard key={task.id} task={task} compact />
@@ -704,20 +818,26 @@ function MockDetailContent() {
           </div>
         </div>
         <Separator />
+
+        {/* Research docs produced by the workflow */}
         <div>
           <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Available Skills
+            Research
           </h3>
-          <div className="mt-2 space-y-1">
-            {mockAdapterSkills.slice(0, 4).map((s) => (
-              <div key={s.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono">{s.cmd}</span>
-                <span className="text-muted-foreground/60">{s.label}</span>
-              </div>
-            ))}
+          <div className="mt-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[9px] px-1 py-0">plan</Badge>
+              <span>Authentication Architecture</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[9px] px-1 py-0">analysis</Badge>
+              <span>Existing auth flow audit</span>
+            </div>
           </div>
         </div>
         <Separator />
+
+        {/* MCP Servers */}
         <div>
           <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             MCP Servers
@@ -739,23 +859,6 @@ function MockDetailContent() {
                 <span className="ml-auto text-[10px]">{s.tools.length} tools</span>
               </div>
             ))}
-          </div>
-        </div>
-        <Separator />
-        <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Active Hooks
-          </h3>
-          <div className="mt-2 space-y-1">
-            {mockHooks
-              .filter((h) => h.enabled)
-              .map((h) => (
-                <div key={h.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                  <span>{h.name}</span>
-                  <span className="ml-auto text-[10px]">{h.event}</span>
-                </div>
-              ))}
           </div>
         </div>
       </div>
@@ -792,9 +895,9 @@ function MockStatusBar() {
       <span className="text-border">|</span>
       <span>feature/auth</span>
       <span className="text-border">|</span>
-      <span>3 MCP servers</span>
+      <span>execute phase</span>
       <span className="text-border">|</span>
-      <span>1 running</span>
+      <span>3 MCP servers</span>
       <span className="flex-1" />
       <span>v0.1.0</span>
     </ShellStatusBar>
@@ -945,13 +1048,19 @@ export function SnapshotsPage() {
         {/* ============================================================= */}
         <Section title="App Shell — High-Level Screens" testId="section-app-shell">
 
-          {/* ---- 1. Landing — Nav tree + context-sensitive commands ---- */}
-          <SubSection title="Landing — Nav Tree + Suggested Actions" testId="ss-shell-landing">
+          {/* ---- 1. Landing — Nav tree + adapter workflows ---- */}
+          <SubSection title="Landing — Nav Tree + Adapter Workflows" testId="ss-shell-landing">
             <div className="h-[600px] rounded-xl border border-border overflow-hidden">
               <AppShell
                 defaultLayout="sidebar-main"
                 navbar={<MockNavbar />}
-                sidebar={<MockNavTree expandSessions={true} expandWorkspaces={true} />}
+                sidebar={
+                  <MockNavTree
+                    expandSessions={true}
+                    expandWorkflows={true}
+                    expandWorkspaces={true}
+                  />
+                }
                 statusBar={<MockStatusBar />}
               >
                 <MockCommandActions />
