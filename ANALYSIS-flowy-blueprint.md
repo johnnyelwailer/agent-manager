@@ -4,13 +4,13 @@
 
 Most of Part 2 is speculative product design that overlaps heavily with what
 agent-manager already architects (contracts, workflow plugins, event-sourced
-sessions). The genuinely useful extractions are narrow: **JSON-as-plan
-visualization** (already scoped via React Flow), **time-travel over
-event-sourced state** (already planned), and one workflow pattern worth
-stealing from Flowy's iteration loop. The "Council of Chapters" and
-"Intent-Based Editor" ideas sound exciting but would introduce massive
-complexity for marginal gain over what the contract + workflow plugin system
-already provides.
+sessions). The genuinely useful extractions are narrow but sharp:
+**multi-modal plan artifacts** (one JSON carrying both flow graphs and
+wireframes, rendered by pluggable viewers), **time-travel over event-sourced
+state** (already planned), and Flowy's iteration loop pattern. The "Council
+of Chapters" and "Intent-Based Editor" ideas sound exciting but would
+introduce massive complexity for marginal gain over what the contract +
+workflow plugin system already provides.
 
 ---
 
@@ -48,32 +48,78 @@ visually verifiable before committing to implementation**.
   takes a JSON plan doc and renders it as a flow graph. This is a UI component
   task, not an architecture task.
 
-**Not relevant:**
+**Not core, but worth supporting as an extension:**
 
-- Flowy's lofi wireframe rendering. Agent-manager is an agent orchestration
-  shell, not a design tool. Rendering UI mockups is out of scope. The agents
-  produce code, not wireframes.
+- Flowy's lofi wireframe rendering. Agent-manager shouldn't build a wireframe
+  renderer itself, but the real insight from Flowy is the **unified plan
+  artifact**: one JSON file that carries both logic flows AND visual layouts.
+  The value is that an agent can produce a single plan containing flow graphs
+  for user journeys *and* wireframes for key screens, and different viewers
+  render different facets of the same artifact. This means the plan schema
+  should be **multi-modal and extensible** — the core defines the structure,
+  extensions provide renderers for block types the core doesn't know about.
 
-- Flowy as a standalone tool. If CJ open-sources it, it could be an MCP
-  server or external tool that agents invoke, but agent-manager shouldn't
-  absorb its functionality. Agent-manager renders agent *work*, not agent
-  *design artifacts*.
+- If CJ open-sources Flowy, it could plug in as a plan block renderer
+  extension. Similarly, a TLDraw-based wireframe renderer, a Mermaid renderer,
+  or an ER diagram renderer could all consume blocks from the same plan file.
+  Agent-manager's job is to define the envelope and extension point, not every
+  renderer.
 
 ### Concrete takeaway
 
-Extend `PlanStep` to optionally include dependency edges:
+Design the plan artifact as a **multi-block document** where each block has
+a type and a typed payload. The core ships renderers for common types (flow
+graphs, text). Extensions register renderers for additional types (wireframes,
+ER diagrams, etc.).
 
 ```typescript
-// Current
+// Current PlanStep — flat, text-only
 { id, description, completed }
 
-// Extended
-{ id, description, completed, dependsOn?: string[] }
+// Revised: Plan as multi-block artifact
+interface PlanBlock {
+  id: string;
+  type: string;                    // 'flow' | 'wireframe' | 'text' | 'schema' | custom
+  title?: string;
+  payload: unknown;                // typed per block type
+}
+
+// Flow block payload (core renderer via @xyflow/react)
+interface FlowBlockPayload {
+  nodes: { id: string; label: string; status?: string }[];
+  edges: { source: string; target: string; label?: string }[];
+}
+
+// Wireframe block payload (extension renderer)
+interface WireframeBlockPayload {
+  screens: { id: string; name: string; elements: WireframeElement[] }[];
+}
+
+// The plan itself
+interface Plan {
+  id: string;
+  issueId: string;
+  blocks: PlanBlock[];             // ordered, multi-modal
+  complexity: 'trivial' | 'simple' | 'moderate' | 'complex';
+  risks: string[];
+  createdAt: string;
+}
 ```
 
-Then a `PlanFlowView` component renders this as a DAG via `@xyflow/react`.
-This is a single component + a one-field schema extension. No new
-architecture needed.
+The block renderer registry is the extension point:
+
+```typescript
+// Core registers built-in renderers
+registerPlanBlockRenderer('flow', FlowBlockRenderer);    // @xyflow/react
+registerPlanBlockRenderer('text', TextBlockRenderer);    // markdown
+
+// Extensions register additional renderers
+registerPlanBlockRenderer('wireframe', WireframeBlockRenderer);  // TLDraw, etc.
+registerPlanBlockRenderer('er_diagram', ERDiagramBlockRenderer);
+```
+
+Unknown block types fall back to a raw JSON viewer. This keeps the core lean
+while making the plan artifact genuinely multi-modal.
 
 ---
 
@@ -248,12 +294,14 @@ architecture. No new systems needed.
 
 Ranked by value-to-effort ratio:
 
-### 1. Structured plan rendering (High value, low effort)
+### 1. Multi-block plan artifacts with pluggable renderers (High value, medium effort)
 
-- Extend `PlanStep` with `dependsOn?: string[]`
-- Build a `PlanFlowView` component using `@xyflow/react`
-- Render plans as DAGs instead of flat lists
-- Already have the library, schema, and contract infrastructure
+- Redesign `Plan` from flat step list to ordered block array
+- Each block has a `type` + typed `payload`
+- Core ships `flow` renderer (`@xyflow/react`) and `text` renderer (markdown)
+- Extension point: `registerPlanBlockRenderer(type, component)`
+- Enables wireframes, ER diagrams, etc. without core changes
+- The unified artifact is the real win — one plan file, multiple visual facets
 
 ### 2. Contextual feedback on rendered artifacts (Medium value, medium effort)
 
@@ -294,8 +342,8 @@ Ranked by value-to-effort ratio:
 4. **Intent inference from spatial manipulation.** Unsolved research problem.
    Don't try to guess what a drag gesture "means."
 
-5. **Wireframe/mockup rendering.** Out of scope. Agent-manager orchestrates
-   coding agents, not design tools.
+5. **Building wireframe renderers in core.** The plan artifact should *support*
+   wireframe blocks, but the renderer is an extension, not a core feature.
 
 ---
 
@@ -303,8 +351,8 @@ Ranked by value-to-effort ratio:
 
 | Idea | Source | Relevant? | Already Exists? | Action |
 |------|--------|-----------|-----------------|--------|
-| JSON plan → flow graph | Flowy | Yes | Partial (React Flow in deps, Plan schema exists) | Extend PlanStep + build PlanFlowView |
-| Lofi wireframe rendering | Flowy | No | N/A | Out of scope |
+| Multi-modal plan artifact | Flowy | Yes | Partial (Plan schema + React Flow in deps) | Redesign Plan as block array + renderer registry |
+| Lofi wireframe rendering | Flowy | Yes (as extension) | No | Extension renderer, not core — plan schema supports it |
 | Intent-based drag editor | Part 2, #1 | No | N/A | Avoid |
 | Multi-agent chapters | Part 2, #2 | Partial | Yes (WorkflowPhase) | Already covered by workflow plugins |
 | Contextual pin comments | Part 2, #3 | Yes | Partial (session chat exists) | Build as UI feature on plan renderer |
