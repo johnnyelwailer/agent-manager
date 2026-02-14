@@ -2,6 +2,25 @@ import { z } from 'zod';
 import { agentEventSchema } from './events.js';
 
 // ---------------------------------------------------------------------------
+// Agent capabilities — what an adapter supports
+// ---------------------------------------------------------------------------
+
+export const agentCapabilitiesSchema = z.object({
+  streaming: z.boolean(),
+  interruptible: z.boolean(),
+  commands: z.boolean(),
+  skills: z.boolean(),
+  mcps: z.boolean(),
+  hooks: z.boolean(),
+  worktrees: z.boolean(),
+  costTracking: z.boolean(),
+  subagents: z.boolean(),
+  autodiscovery: z.boolean(),
+});
+
+export type AgentCapabilities = z.infer<typeof agentCapabilitiesSchema>;
+
+// ---------------------------------------------------------------------------
 // Adapter manifest
 // ---------------------------------------------------------------------------
 
@@ -10,6 +29,7 @@ export const adapterManifestSchema = z.object({
   name: z.string(),
   version: z.string(),
   runtime: z.string(),
+  capabilities: agentCapabilitiesSchema.optional(),
 });
 
 export type AdapterManifest = z.infer<typeof adapterManifestSchema>;

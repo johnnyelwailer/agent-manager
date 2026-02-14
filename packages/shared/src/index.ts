@@ -14,6 +14,7 @@ export {
 } from './schemas/events.js';
 
 export {
+  agentCapabilitiesSchema,
   adapterManifestSchema,
   sessionConfigSchema,
   sessionStatusSchema,

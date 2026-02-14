@@ -991,6 +991,87 @@ Safety Net:        Git auto-snapshots before every agent run
 
 ---
 
+## Phase 7: App Shell Architecture Decisions
+
+> **Status:** Decided (2026-02-14)
+> **Context:** Designing the layout shell — the outermost chrome that frames all adapter content.
+
+### 7.1 — Shell Responsibility Model
+
+> **Research Question:** How much intelligence should the shell have? Should it interpret adapter content, or just render it?
+
+| Model | Description | Pros | Cons |
+|-------|------------|------|------|
+| **A. Smart shell** | Shell understands adapter concepts, routes between views, manages focus | Consistent UX, can enforce patterns | Tight coupling, hard to extend, adapter innovation constrained |
+| **B. Dumb shell** | Shell provides layout + grouping only. Adapters drive all content. | Maximally extensible, adapters can innovate freely | Shell can't enforce UX consistency, adapters must handle more |
+| **C. Hybrid** | Shell provides layout + grouping + default renderers. Adapters can override. | Best of both — predictable defaults, adapter override when useful | More API surface to maintain |
+
+**Decision: C (Hybrid).** The shell provides:
+- Layout chrome (navbar, sidebar nav tree, status bar, panel arrangement)
+- Default renderers for standard content types (sessions → chat thread, files → viewer)
+- Grouping of all content by owning adapter
+
+Adapters can optionally provide richer views. A file opens as you'd expect (default renderer), but an adapter with a specialized diff viewer or workflow phase renderer can override.
+
+### 7.2 — Multi-Adapter Concurrency
+
+> **Research Question:** Can multiple workflow extensions / adapters run simultaneously? How do conflicts resolve?
+
+| Model | Description | Pros | Cons |
+|-------|------------|------|------|
+| **A. Fully concurrent** | Multiple adapters run simultaneously. Shell groups by adapter. | Maximum flexibility, no artificial constraints | Potential UI clutter if many adapters active |
+| **B. Isolated scopes** | Multiple adapters coexist but each gets its own session scope | Clean isolation | Prevents cross-adapter workflows |
+| **C. One active at a time** | Only one workflow extension active. User switches explicitly. | Simple, no conflicts | Too restrictive, doesn't match how agents actually work |
+
+**Decision: A (Fully concurrent).** Key rationale:
+
+1. **GSD runs within Claude.** A workflow like GSD that layers on top of Claude Code is handled entirely by Claude's adapter. The shell doesn't need to arbitrate between Claude and GSD — Claude manages that internally. This eliminates the most common "conflict" scenario.
+
+2. **Primary vs. background is per-adapter.** Each adapter tracks whether it's the primary active adapter (user initiated a session through it) or backgrounded (another adapter took focus). This is mainly for **action display** — the primary adapter shows its full action set, backgrounded adapters show minimal actions.
+
+3. **Shell just renders both.** If two adapters both surface suggested actions, the shell renders both sets, grouped under their respective adapter headers. No merging, no conflict resolution at the shell level. Users disambiguate by visual grouping.
+
+### 7.3 — Capability-Driven Nav Tree
+
+> **Research Question:** How should the sidebar navigation adapt to different adapter capabilities?
+
+**Decision:** The nav tree is driven entirely by `AgentCapabilities`. Each adapter section only shows subsections for capabilities the adapter actually declares.
+
+This means:
+- Claude Code (full capabilities) shows: Sessions, Workflows, Skills, MCP Servers, Hooks
+- A minimal adapter (streaming + interruptible only) shows: Sessions
+- A custom adapter that supports MCP but not skills shows: Sessions, MCP Servers
+
+This keeps the UI honest — nothing appears that can't actually be used.
+
+### 7.4 — File Rendering Strategy
+
+> **Research Question:** When a user opens a file (plan doc, code, config), who decides how to render it?
+
+| Model | Description |
+|-------|------------|
+| **A. Always adapter** | Adapter always provides the renderer |
+| **B. Always default** | Shell has built-in renderers, adapters can't override |
+| **C. Default with adapter override** | Shell provides sensible default, adapter can offer richer view |
+
+**Decision: C (Default with adapter override).** A file opens predictably — the shell picks the renderer based on file type (markdown → viewer, code → syntax-highlighted, JSON → tree view). But if an adapter has something better to offer (e.g., a specialized constitution editor for GSD's constitution.md, or an interactive plan editor that understands task structure), the adapter's renderer takes precedence.
+
+This is progressive enhancement: the baseline experience is always good, and adapters make it better when they can.
+
+### 7.5 — Session Context Display
+
+> **Research Question:** What should the sidebar show for each session beyond "adapter-id"?
+
+**Decision:** Each session in the nav tree shows:
+- **Status dot** — color-coded (running=blue pulse, completed=green, failed=red, starting=amber)
+- **Prompt snippet** — truncated first line of the task prompt (this is the most meaningful identifier)
+- **Adapter** — shown at the group level, not per-session
+- **Model** — in the session detail header, not the nav tree (too noisy)
+
+The adapter ID is shown as the parent group label, not repeated on every session. This is cleaner and matches how users think — "these are my Claude sessions" not "this session uses claude-code".
+
+---
+
 ## Next Steps (Immediate)
 
 1. **Week 1:** Run Experiments A and B in parallel. Validate the two hardest unknowns: FS→UI pipeline and SDK→Event pipeline.

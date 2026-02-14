@@ -193,6 +193,87 @@ Think of it as the **desktop environment for AI agents**:
  claude    gsd run      mm exec     user-defined
 ```
 
+## App Shell Design
+
+The app shell is the outermost layout chrome — navbar, sidebar, status bar, and panel arrangement. It is intentionally **dumb**: it renders content grouped by adapter but has no opinion about what adapters do or how they work. All intelligence lives in the adapters; the shell is just a frame.
+
+### Core Principles
+
+1. **Shell is a dumb renderer.** The shell provides layout (sidebar, main, detail panels), navigation, and grouping. It does not interpret adapter content — it receives structured data and renders it.
+2. **Adapters drive content.** Each adapter declares what it supports via `AgentCapabilities`. The shell uses this to decide which nav sections to show (Sessions, Skills, MCP Servers, Hooks, Worktrees) per adapter.
+3. **Default renderer with adapter override.** Every content type has a default renderer (e.g., sessions render as chat threads). Adapters can optionally provide richer views when they have something better to offer. Files open predictably; adapters enhance progressively.
+
+### Multi-Adapter Concurrency
+
+Multiple adapters (and workflow extensions layered on the same base adapter) run **fully concurrently**. The shell handles this by:
+
+- **Grouping by adapter.** The nav tree organizes all content under its owning adapter. Sessions, skills, workflows, MCP servers — everything is scoped to the adapter that provides it.
+- **Primary vs. background awareness.** Each adapter can detect whether it's the **primary active** adapter (e.g., because the user initiated a session through it directly) or **backgrounded** (another adapter took over the user's focus). This distinction affects which actions an adapter surfaces — the primary adapter shows its full action set, while backgrounded adapters show minimal or contextual actions only.
+- **Shell renders both.** When multiple adapters are active, the shell renders all of their content, grouped by adapter. There is no conflict resolution at the shell level — if two adapters both provide suggested actions, both sets appear (grouped under their respective adapter headers). The user disambiguates by context.
+
+This means a workflow extension like GSD that runs **within** Claude Code is handled entirely by Claude — the shell doesn't need to know about GSD's internals. If a separate adapter (e.g., `aider`) is also running, its content appears in its own nav tree section.
+
+### AgentCapabilities
+
+Each adapter declares its capabilities in the manifest:
+
+```typescript
+interface AgentCapabilities {
+  streaming: boolean;        // real-time event output
+  interruptible: boolean;    // can be interrupted mid-task
+  commands: boolean;         // supports slash commands
+  skills: boolean;           // supports skills
+  mcps: boolean;             // supports MCP servers
+  hooks: boolean;            // supports lifecycle hooks
+  worktrees: boolean;        // supports multiple worktrees
+  costTracking: boolean;     // reports token/cost data
+  subagents: boolean;        // can spawn sub-agents
+  autodiscovery: boolean;    // can enumerate its own capabilities
+}
+```
+
+The sidebar nav tree only shows sections for capabilities the adapter actually supports. An adapter that doesn't support MCP won't have an "MCP Servers" section. An adapter that doesn't support skills won't show a "Skills" section. This keeps the UI honest — you only see what's real.
+
+### Nav Tree Structure
+
+```
+AGENTS
+├── claude-code (●connected)
+│   ├── Sessions (expandable)
+│   │   ├── ● Add unit tests for payment... (running)
+│   │   ├── ● Refactor auth module... (completed)
+│   │   └── ● Fix database pool leak... (failed)
+│   ├── Workflows (if adapter.capabilities → supported)
+│   ├── Skills (if adapter.capabilities.skills)
+│   └── MCP Servers (if adapter.capabilities.mcps)
+├── aider (●starting, dimmed)
+│   └── Sessions
+│       └── ● Migrate from Express... (starting)
+WORKSPACES
+├── ● main (clean)
+├── ● feature/auth (dirty, 5 files)
+└── ● fix/overflow (conflict)
+Settings
+```
+
+### Session Context in Sidebar
+
+Sessions in the nav tree show meaningful context beyond just the adapter ID:
+- **Prompt snippet** — truncated first line of the task prompt
+- **Status indicator** — color-coded dot (running/completed/failed/starting)
+- **Model** — which model is being used (when relevant)
+- **Working directory** — the cwd context for the session
+
+### Command Actions (Landing View)
+
+When no session is selected, the main panel shows adapter-provided actions:
+- **Workflows** — multi-phase operations the adapter supports (Plan & Build, Code Review, Debug & Fix)
+- **Quick Commands** — slash commands from adapter discovery (`/commit`, `/test`, `/refactor`)
+- **Context hints** — environmental awareness (uncommitted files, MCP errors, active workflow progress)
+- **Composer** — prompt input to start a new session
+
+These actions are grouped by adapter. When multiple adapters are active, each adapter's actions appear under its own header. The primary adapter's actions appear first/prominently.
+
 ## Agent UI Component System
 
 The core of the framework is a library of UI components that map 1:1 to common agent concepts. Each component has a **contract** (abstract interface) and one or more **implementations** (concrete UI).
