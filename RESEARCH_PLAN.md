@@ -1348,111 +1348,118 @@ The core tension: **GSD doesn't know about OpenHands. OpenHands doesn't know abo
 
 This is a **cross-adapter composition** problem. It's fundamentally different from multi-agent orchestration (where one framework manages multiple agents). Here, independent adapters need to pass work products between each other without direct coupling.
 
-### 9.2 — Three Approaches Analyzed
+### 9.2 — Three Complementary Layers (Not Competing Approaches)
 
-#### Approach A: Agent-Native Integrations
-
-Use each agent's own extension system (Claude Code skills/MCP, OpenAI tools, etc.) to expose handoff capabilities.
+Initial analysis treated agent-native tools, shell injection, and artifact detection as mutually exclusive approaches. On further consideration, **they're complementary layers** that serve different interaction styles and can all coexist. All three ultimately do the same thing: take a work product from session A and create session B with it. They differ only in *who extracts the context* and *who initiates the action*.
 
 ```
-Claude Code ──[MCP tool: execute_in_sandbox()]──→ OpenHands
+Layer 3 (Contextual UI):    Artifact bus detects plans → shows execute buttons
+Layer 2 (Conversational):   User says "run this in a sandbox" → agent packages context → shell routes
+Layer 1 (Direct command):   User types /execute-in-openhands → shell grabs context → routes
 ```
 
-**Pros:**
-- Agent can reason about when to hand off conversationally
-- Uses existing, battle-tested extension mechanisms
-- Agent maintains full control of the flow
+#### Layer 1: Direct Shell Actions (slash commands / command palette)
 
-**Cons:**
-- GSD must know about execution environments — violates the independence principle
-- Every agent has a different tool system — not portable
-- MCP tool descriptions consume context window
-- What happens when the target adapter isn't available? Agent hallucinates the tool?
-- Tight coupling disguised as loose coupling
-
-**Verdict:** Not the right layer. Agent-native tools are for giving an agent access to *its own* capabilities, not for cross-adapter orchestration.
-
-#### Approach B: Shell Injects Synthetic Tools Into Agents
-
-Shell inspects available adapters at session start, then injects tool definitions into the agent: "You have `execute_in_sandbox(plan)`, `send_to_cloud(plan)` available."
+User triggers a shell-level action. No agent involvement.
 
 ```
-Shell ──[injects tools]──→ Claude Code ──[calls tool]──→ Shell ──[creates session]──→ OpenHands
+User types: /execute-in-openhands
+Shell: grabs conversation context from current session → creates OpenHands session
 ```
 
-**Pros:**
-- Agent can initiate handoff conversationally ("I've created a plan, shall I hand it off?")
-- Shell mediates — agent doesn't know about specific adapters
-- Could work for agents that support tool injection
+- **How context is extracted:** Shell takes the full conversation history (or last N turns) and passes it to the target adapter. The target adapter's agent figures out what to do with it.
+- **When it works:** Power users who know what they want. Quick, no ambiguity.
+- **Adapter contract:** Adapters register shell actions in their manifest. Shell shows them in command palette when that adapter is available.
 
-**Cons:**
-- Pollutes agent context with shell-level concerns
-- Different agents handle injected tools differently (Claude vs OpenAI vs OSS)
-- Fragile — agent might call the tool inappropriately
-- The agent becomes a middleman in a shell-level operation
-- Injecting instructions/tools into agents is model-specific and hard to maintain
-- Breaks when agents have their own tool validation
+#### Layer 2: Conversation-Driven Handoff (agent-assisted)
 
-**Verdict:** Tempting but wrong abstraction level. This conflates the agent's reasoning about *what to do* with the shell's job of *routing work between environments*.
+User asks the agent conversationally. Agent helps package context. Shell mediates the actual routing.
 
-#### Approach C: Artifact Bus with Adapter-Declared Consumption ✓
+```
+User: "now execute this plan in a sandbox"
+Agent: [understands what "this plan" means — it just wrote it]
+       [calls generic handoff tool with structured plan content]
+Shell: intercepts tool call → creates target session with packaged context
+```
 
-**Nobody tells the agent anything.** Instead:
-1. Adapters declare what **artifact types** they produce and consume (in their manifest)
-2. When an adapter emits an artifact event, the **shell** matches it to consumers
-3. The shell shows contextual actions in the UI
-4. The user clicks to initiate handoff
-5. Shell creates a new session with the consuming adapter, passing the artifact
+**Key insight: the LLM is the best artifact extractor.** The agent just wrote the plan. It knows exactly what's relevant, what the dependencies are, what the success criteria are. Asking a heuristic to extract this is strictly worse than asking the agent that produced it.
+
+The tool doesn't need to be adapter-specific. A single generic tool works:
+
+```typescript
+// Generic — not "execute_in_openhands", just "handoff"
+interface HandoffTool {
+  name: 'handoff_to_environment';
+  params: {
+    intent: string;              // "execute this implementation plan"
+    content: string;             // the plan, diff, analysis, etc.
+    context?: {
+      repository?: string;
+      branch?: string;
+      files?: string[];
+    };
+  };
+}
+```
+
+The agent never knows *where* this goes. The shell decides routing based on available adapters, user preference, or a follow-up prompt ("which environment?").
+
+**Critical insight:** Execute is always user-initiated. The user says "run this in a sandbox" — the agent doesn't autonomously decide to ship work elsewhere. This eliminates the "agent calls tool at wrong time" concern from the earlier analysis. The earlier rejection of this approach was based on the assumption that the agent would autonomously decide to hand off — but in practice, handoff is a response to a user request, mediated by the agent's context-packaging intelligence.
+
+**How to inject the tool:** For agents that support it (Claude Code via MCP, OpenAI via tools), the shell provides a lightweight MCP server or tool definition. For agents that don't, Layer 1 (slash commands) covers the same use case. The tool description is minimal — one tool, ~50 tokens of context window. Not "polluting" — comparable to any other MCP tool the agent has access to.
+
+#### Layer 3: Contextual Artifact Detection (automatic UI affordances)
+
+Shell automatically detects work products and shows relevant actions, without the agent or user doing anything explicit.
+
+```
+Agent writes a plan → Adapter pattern-matches → Shell shows [▶ Execute] buttons
+Agent produces a diff → Adapter detects → Shell shows [▶ Review] [▶ Create PR] buttons
+```
+
+- **How context is extracted:** Adapter-specific heuristics (file patterns, tool use patterns, structured output conventions). See §9.4 for strategies.
+- **When it works:** Discoverability — user might not know that sandbox execution is available until they see the button. Also works when the user didn't ask for handoff but the shell recognizes the opportunity.
+- **Adapter contract:** Adapters declare `produces` and `consumes` artifact types in their manifest. Shell matches at runtime.
+
+#### How the Three Layers Interact
 
 ```
 ┌─ GSD Session ──────────────────────────────────────────────┐
 │                                                            │
-│  Claude: "Here's my implementation plan:"                  │
-│  [structured plan content]                                 │
-│          ↓                                                 │
-│  GSD adapter emits: artifact_produced { type: 'plan' }     │
-│          ↓                                                 │
-│  ┌─ Shell Artifact Matching ─────────────────────────────┐ │
-│  │                                                       │ │
-│  │  OpenHands manifest says:                             │ │
-│  │    consumes: [{ type: 'plan', action: 'Execute' }]    │ │
-│  │                                                       │ │
-│  │  Codex manifest says:                                 │ │
-│  │    consumes: [{ type: 'plan', action: 'Execute' }]    │ │
-│  │                                                       │ │
-│  │  → Show action buttons in event stream                │ │
-│  └───────────────────────────────────────────────────────┘ │
+│  User: "Create a plan to refactor the auth module"         │
+│  Claude: [produces detailed plan]                          │
 │                                                            │
-│  ┌──────────────┐ ┌───────────────┐ ┌──────────────┐      │
-│  │▶ Execute in  │ │▶ Execute in   │ │▶ Execute in  │      │
-│  │  OpenHands   │ │  Codex Cloud  │ │  Jules       │      │
-│  └──────────────┘ └───────────────┘ └──────────────┘      │
+│  ┌─ Layer 3: Artifact Detection ───────────────────────┐   │
+│  │ Shell detected plan artifact → showing actions      │   │
+│  │ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │   │
+│  │ │▶ Execute in  │ │▶ Execute in  │ │▶ Execute in  │ │   │
+│  │ │  OpenHands   │ │  Codex Cloud │ │  Jules       │ │   │
+│  │ └──────────────┘ └──────────────┘ └──────────────┘ │   │
+│  └─────────────────────────────────────────────────────┘   │
 │                                                            │
-│  [User clicks "Execute in OpenHands"]                      │
-│          ↓                                                 │
-│  Shell creates OpenHands session:                          │
-│    - plan artifact as structured input                     │
-│    - codebase context (repo path, branch, etc.)            │
-│    - link back to originating session                      │
-│          ↓                                                 │
-│  Both sessions visible in sidebar, linked                  │
+│  OR — Layer 2: Conversational                              │
+│  User: "execute this in a sandbox"                         │
+│  Claude: [calls handoff_to_environment tool with plan]     │
+│  Shell: "Which environment?" → [OpenHands] [E2B] [Codex]  │
+│                                                            │
+│  OR — Layer 1: Direct command                              │
+│  User: /execute-in-openhands                               │
+│  Shell: [grabs conversation, creates OpenHands session]    │
+│                                                            │
+│  All three paths → same outcome:                           │
+│  New session created, linked in sidebar, artifact passed   │
 └────────────────────────────────────────────────────────────┘
 ```
 
-**Pros:**
-- Complete decoupling — GSD never knows about OpenHands
-- Adapters only declare static metadata — no runtime coupling
-- Shell mediates all cross-adapter flow — single point of control
-- UI is explicit — user always sees and approves the handoff
-- Works for *any* artifact type, not just plans (diffs, PRs, test results, analyses)
-- New adapters automatically participate by declaring consume/produce in their manifest
+Each layer has a strength:
 
-**Cons:**
-- User must click a button — agent can't initiate handoff conversationally
-- Artifact extraction requires adapter cooperation (adapter must emit artifact events)
-- Less "magical" than the agent saying "shall I hand this off?"
+| Layer | Strength | Limitation |
+|-------|----------|------------|
+| **1 — Slash command** | Zero ambiguity, power users, always works | User must know the command exists |
+| **2 — Conversational** | Natural flow, agent packages context perfectly | Requires tool injection support in the agent |
+| **3 — Artifact detection** | Discoverability, zero effort from user | Requires extraction heuristics, may miss or false-positive |
 
-**Verdict: This is the right approach.** The shell is the orchestrator. Agents do what they're good at (reasoning, planning, coding). The shell does what it's good at (routing, lifecycle management, UI).
+**Implementation priority:** Layer 1 first (cheapest, always works), Layer 3 next (best UX for discoverability), Layer 2 last (most natural but needs tool injection plumbing per agent type).
 
 ### 9.3 — The Artifact Contract
 
@@ -1667,49 +1674,59 @@ When an artifact has consumers, the event stream renderer shows **action chips**
 └─────────────────────────────────────────────────┘
 ```
 
-### 9.7 — Why NOT Inject Tools/Instructions Into Agents
+### 9.7 — Agent Awareness: How Much Should the Agent Know?
 
-The user specifically asked: "should we provide special tools or instructions into the agents?"
+The question: "should we inject special tools or instructions into agents, or keep them fully unaware of the shell's routing capabilities?"
 
-**No, and here's why:**
+**Answer: it depends on the layer, and both approaches are valid at different levels.**
 
-1. **Separation of concerns.** The agent's job is to think and produce work. The shell's job is to route work between environments. Mixing these creates a leaky abstraction.
+#### What the agent SHOULD know (Layer 2 tool)
 
-2. **Agent fragility.** Injecting tools into Claude Code via MCP is technically possible, but:
-   - The tool descriptions consume context window (every turn)
-   - The agent might call the tool at the wrong time
-   - Different models handle synthetic tools differently
-   - You'd need model-specific prompt engineering for each adapter×model combination
+For agents that support tool injection (Claude Code via MCP, OpenAI via tools), the shell can provide a single generic `handoff_to_environment` tool. This is justified because:
 
-3. **The agent can't know the state of other adapters.** Is OpenHands available right now? Is there a running sandbox? How much would it cost? These are shell-level concerns that the agent shouldn't reason about.
+1. **Execute is always user-initiated.** The user says "run this in a sandbox." The agent responds by packaging context and calling the tool. It doesn't autonomously decide to ship work. The earlier concern about "agent calls tool at wrong time" doesn't apply when handoff is a direct response to a user request.
 
-4. **The action is fundamentally a user decision.** "Where should this plan be executed?" is a routing decision, not a reasoning decision. The user should make it, with the shell showing what's available.
+2. **The LLM is the best context packager.** The agent just wrote the plan. It knows what's relevant — dependencies, success criteria, risk areas. A heuristic extraction system is strictly worse at this. Letting the agent call a handoff tool with structured content means the receiving adapter gets well-packaged input.
 
-5. **It works both ways.** The same mechanism that hands a plan from GSD→OpenHands also hands a diff from OpenHands→GSD for review, or a PR spec from Codex→GitHub. Agent-injected tools would only work in one direction.
+3. **One generic tool, minimal context cost.** Not "execute_in_openhands" — just "handoff_to_environment". ~50 tokens of tool description. Comparable to any MCP tool. The agent never sees adapter names, pricing, or availability.
 
-### 9.8 — Optional Enhancement: Agent Hint
+4. **Shell still controls routing.** The agent says "hand this off." The shell decides *where* based on available adapters and user preference. The agent is a context packager, not a router.
 
-There's a lightweight middle ground that doesn't compromise the architecture. Adapters can optionally include a **single-line hint** in the agent's system context:
+#### What the agent SHOULD NOT know
+
+- Which specific adapters/environments are available
+- Whether those environments are currently running or healthy
+- Pricing, quotas, or resource constraints
+- Implementation details of the target environment
+
+These remain shell-level concerns. The agent's tool is a generic "I have packaged work for handoff" signal. The shell handles everything else.
+
+#### What about agents that DON'T support tool injection?
+
+Layer 1 (slash commands) covers them. `/execute-in-openhands` works regardless of whether the agent has any awareness. The shell grabs the conversation context directly.
+
+#### Optional: Awareness hint for better artifact formatting
+
+Adapters can optionally include a single-line hint in the agent's system context:
 
 > "When you produce a structured implementation plan, the user's environment can route it to sandboxed execution environments for autonomous implementation."
 
-This doesn't inject tools. It doesn't name specific adapters. It just makes the agent aware that plans are *actionable* — so it might format them more carefully, or ask the user "Would you like me to produce a structured plan that can be executed autonomously?"
+This makes the agent format plans more carefully (clear steps, file paths, success criteria) without any tool coupling. It improves Layer 3 artifact detection AND Layer 2 context packaging.
 
-The agent never calls a tool. It never knows about OpenHands. It just knows that well-structured plans have downstream value. This is the same pattern as "write clean code because it might be reviewed" — a general awareness, not a specific integration.
-
-### 9.9 — Key Design Decisions
+### 9.8 — Key Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Who orchestrates handoffs? | **Shell** (not agents) | Agents don't know about each other |
-| How are artifacts detected? | **Adapter pattern matching** | Each adapter knows its own agent's outputs |
+| Who orchestrates handoffs? | **Shell** (not agents) | Agents don't know about each other. Shell controls routing. |
+| How are artifacts extracted? | **Three layers** | L1: slash commands (always works), L2: agent tool call (best quality), L3: adapter heuristics (discoverability) |
 | How are consumers discovered? | **Manifest declarations** | Static metadata, no runtime coupling |
-| Who initiates handoff? | **User** (via UI action) | Routing is a user decision, not agent reasoning |
-| Can agents know about handoff? | **Optional hint only** | Awareness without coupling |
+| Who initiates handoff? | **Always the user** | Even in L2, agent only packages context in response to user request |
+| Can agents know about handoff? | **Generic tool + optional hint** | One abstract `handoff_to_environment` tool, no adapter specifics. Hint improves formatting. |
 | How are sessions linked? | **Artifact provenance chain** | Each artifact records source session, consuming session links back |
 | Are handoffs reversible? | **Yes** — artifacts are immutable, sessions can be abandoned | No destructive state changes |
+| What does the agent route to? | **Nothing — shell decides** | Agent says "hand this off." Shell picks target based on availability + user choice. |
 
-### 9.10 — Relationship to AG-UI Protocol
+### 9.9 — Relationship to AG-UI Protocol
 
 AG-UI defines 5 event categories. Our `artifact_produced` event maps cleanly to AG-UI's "state" event category (shared state between agent and UI). The action buttons map to AG-UI's "tool" event category (UI-initiated actions).
 
