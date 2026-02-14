@@ -1337,6 +1337,386 @@ Based on ecosystem maturity, user demand, and adapter complexity:
 
 ---
 
+## Phase 9: Cross-Adapter Handoff — The Artifact Bus
+
+> **Status:** Design analysis (2026-02-14)
+> **Context:** User creates a plan in GSD (Claude Code), wants to hand it off to OpenHands/Codex/Jules for autonomous execution. GSD has no knowledge of other adapters. How does this work seamlessly within one conversation?
+
+### 9.1 — The Problem
+
+The core tension: **GSD doesn't know about OpenHands. OpenHands doesn't know about GSD. But the user wants plan→execute to feel like one fluid motion within the same shell.**
+
+This is a **cross-adapter composition** problem. It's fundamentally different from multi-agent orchestration (where one framework manages multiple agents). Here, independent adapters need to pass work products between each other without direct coupling.
+
+### 9.2 — Three Approaches Analyzed
+
+#### Approach A: Agent-Native Integrations
+
+Use each agent's own extension system (Claude Code skills/MCP, OpenAI tools, etc.) to expose handoff capabilities.
+
+```
+Claude Code ──[MCP tool: execute_in_sandbox()]──→ OpenHands
+```
+
+**Pros:**
+- Agent can reason about when to hand off conversationally
+- Uses existing, battle-tested extension mechanisms
+- Agent maintains full control of the flow
+
+**Cons:**
+- GSD must know about execution environments — violates the independence principle
+- Every agent has a different tool system — not portable
+- MCP tool descriptions consume context window
+- What happens when the target adapter isn't available? Agent hallucinates the tool?
+- Tight coupling disguised as loose coupling
+
+**Verdict:** Not the right layer. Agent-native tools are for giving an agent access to *its own* capabilities, not for cross-adapter orchestration.
+
+#### Approach B: Shell Injects Synthetic Tools Into Agents
+
+Shell inspects available adapters at session start, then injects tool definitions into the agent: "You have `execute_in_sandbox(plan)`, `send_to_cloud(plan)` available."
+
+```
+Shell ──[injects tools]──→ Claude Code ──[calls tool]──→ Shell ──[creates session]──→ OpenHands
+```
+
+**Pros:**
+- Agent can initiate handoff conversationally ("I've created a plan, shall I hand it off?")
+- Shell mediates — agent doesn't know about specific adapters
+- Could work for agents that support tool injection
+
+**Cons:**
+- Pollutes agent context with shell-level concerns
+- Different agents handle injected tools differently (Claude vs OpenAI vs OSS)
+- Fragile — agent might call the tool inappropriately
+- The agent becomes a middleman in a shell-level operation
+- Injecting instructions/tools into agents is model-specific and hard to maintain
+- Breaks when agents have their own tool validation
+
+**Verdict:** Tempting but wrong abstraction level. This conflates the agent's reasoning about *what to do* with the shell's job of *routing work between environments*.
+
+#### Approach C: Artifact Bus with Adapter-Declared Consumption ✓
+
+**Nobody tells the agent anything.** Instead:
+1. Adapters declare what **artifact types** they produce and consume (in their manifest)
+2. When an adapter emits an artifact event, the **shell** matches it to consumers
+3. The shell shows contextual actions in the UI
+4. The user clicks to initiate handoff
+5. Shell creates a new session with the consuming adapter, passing the artifact
+
+```
+┌─ GSD Session ──────────────────────────────────────────────┐
+│                                                            │
+│  Claude: "Here's my implementation plan:"                  │
+│  [structured plan content]                                 │
+│          ↓                                                 │
+│  GSD adapter emits: artifact_produced { type: 'plan' }     │
+│          ↓                                                 │
+│  ┌─ Shell Artifact Matching ─────────────────────────────┐ │
+│  │                                                       │ │
+│  │  OpenHands manifest says:                             │ │
+│  │    consumes: [{ type: 'plan', action: 'Execute' }]    │ │
+│  │                                                       │ │
+│  │  Codex manifest says:                                 │ │
+│  │    consumes: [{ type: 'plan', action: 'Execute' }]    │ │
+│  │                                                       │ │
+│  │  → Show action buttons in event stream                │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                            │
+│  ┌──────────────┐ ┌───────────────┐ ┌──────────────┐      │
+│  │▶ Execute in  │ │▶ Execute in   │ │▶ Execute in  │      │
+│  │  OpenHands   │ │  Codex Cloud  │ │  Jules       │      │
+│  └──────────────┘ └───────────────┘ └──────────────┘      │
+│                                                            │
+│  [User clicks "Execute in OpenHands"]                      │
+│          ↓                                                 │
+│  Shell creates OpenHands session:                          │
+│    - plan artifact as structured input                     │
+│    - codebase context (repo path, branch, etc.)            │
+│    - link back to originating session                      │
+│          ↓                                                 │
+│  Both sessions visible in sidebar, linked                  │
+└────────────────────────────────────────────────────────────┘
+```
+
+**Pros:**
+- Complete decoupling — GSD never knows about OpenHands
+- Adapters only declare static metadata — no runtime coupling
+- Shell mediates all cross-adapter flow — single point of control
+- UI is explicit — user always sees and approves the handoff
+- Works for *any* artifact type, not just plans (diffs, PRs, test results, analyses)
+- New adapters automatically participate by declaring consume/produce in their manifest
+
+**Cons:**
+- User must click a button — agent can't initiate handoff conversationally
+- Artifact extraction requires adapter cooperation (adapter must emit artifact events)
+- Less "magical" than the agent saying "shall I hand this off?"
+
+**Verdict: This is the right approach.** The shell is the orchestrator. Agents do what they're good at (reasoning, planning, coding). The shell does what it's good at (routing, lifecycle management, UI).
+
+### 9.3 — The Artifact Contract
+
+```typescript
+// ─── Artifact Types ───────────────────────────────────────
+
+type ArtifactType =
+  | 'implementation-plan'   // structured plan with steps, files, dependencies
+  | 'diff'                  // code changes (unified diff, patch)
+  | 'pr-spec'               // pull request specification (title, body, branch)
+  | 'test-suite'            // test cases to run
+  | 'codebase-analysis'     // analysis of codebase structure, issues, etc.
+  | 'review'                // code review with comments
+  | string;                 // extensible — adapters can define custom types
+
+interface Artifact {
+  id: string;
+  type: ArtifactType;
+  title: string;                                    // human-readable label
+  content: unknown;                                 // typed per artifact type
+  source: {
+    adapterId: string;
+    sessionId: string;
+  };
+  context?: {
+    repository?: string;                            // repo path or URL
+    branch?: string;
+    files?: string[];                               // relevant file paths
+  };
+  createdAt: number;
+}
+
+// ─── Adapter Manifest Extensions ──────────────────────────
+
+interface AdapterManifest {
+  // ... existing fields ...
+
+  /** Artifact types this adapter's sessions may produce */
+  produces?: ArtifactType[];
+
+  /** Artifact types this adapter can consume, and how */
+  consumes?: ArtifactConsumption[];
+}
+
+interface ArtifactConsumption {
+  artifactType: ArtifactType;
+  action: string;                   // "Execute plan", "Review diff", "Run tests"
+  description: string;              // shown in tooltip
+  inputMapping: 'structured' | 'prompt';
+  // 'structured' = adapter expects the artifact as structured data
+  // 'prompt' = adapter expects the artifact serialized into a text prompt
+}
+
+// ─── New Event Type ───────────────────────────────────────
+
+interface ArtifactProducedEvent {
+  type: 'artifact_produced';
+  artifact: Artifact;
+}
+// Added to the AgentEvent discriminated union.
+// When the shell sees this event, it runs artifact matching.
+
+// ─── Shell Artifact Registry ──────────────────────────────
+
+interface ArtifactRegistry {
+  register(artifact: Artifact): void;
+  getConsumers(artifactType: ArtifactType): ArtifactConsumption[];
+  getArtifact(id: string): Artifact | undefined;
+  getArtifactsForSession(sessionId: string): Artifact[];
+}
+```
+
+### 9.4 — How Artifacts Get Extracted
+
+The hardest sub-problem: **how does the shell know an agent produced a plan?**
+
+The agent (e.g., Claude Code) is just generating text. It doesn't know it's producing an "artifact." Four extraction strategies, in order of reliability:
+
+#### Strategy 1: Adapter-Recognized Patterns (primary)
+
+Each adapter knows its own agent's output patterns. The Claude Code adapter knows that when Claude writes to `PLAN.md` or uses TodoWrite with a structured plan format, that's a plan artifact. The OpenHands adapter knows that when its agent produces a `.patch` file, that's a diff artifact.
+
+```typescript
+// Inside ClaudeCodeAdapter.startSession():
+onEvent(event) {
+  if (event.type === 'tool_use' && event.tool === 'Write' && event.path.endsWith('PLAN.md')) {
+    // Extract plan content, emit artifact
+    this.emitArtifact({
+      type: 'implementation-plan',
+      title: 'Implementation Plan',
+      content: parsePlan(event.content),
+      context: { repository: this.repoPath }
+    });
+  }
+}
+```
+
+**Pro:** Adapter-specific, high precision, no agent changes needed.
+**Con:** Heuristic — might miss some plans, might false-positive on others.
+
+#### Strategy 2: Structured Output Convention
+
+Define a lightweight convention that agents can optionally follow. For Claude Code, this could be a specific YAML frontmatter format or a code fence with a special language tag:
+
+````
+```artifact:implementation-plan
+title: Refactor auth module
+steps:
+  - file: src/auth/handler.ts
+    action: modify
+    description: Extract token validation into middleware
+...
+```
+````
+
+The adapter watches for this pattern and extracts it.
+
+**Pro:** Explicit, reliable, agent remains in control of content.
+**Con:** Requires agent to know the convention (but this is just a prompt instruction, not tool coupling).
+
+#### Strategy 3: User-Initiated Extraction
+
+User selects a portion of the conversation and says "use this as a plan." Shell captures the selection as an artifact.
+
+**Pro:** Works with any agent, zero extraction logic needed.
+**Con:** Manual, breaks the seamless flow.
+
+#### Strategy 4: Post-Hoc LLM Extraction
+
+After the agent finishes (or at any pause), shell runs a lightweight model over the conversation to extract structured artifacts.
+
+**Pro:** Works retroactively, catches things the adapter missed.
+**Con:** Latency, cost, reliability concerns.
+
+**Recommended approach:** Strategy 1 as the primary mechanism, with Strategy 3 as a universal fallback. Strategy 2 as an optional enhancement for adapters that want high-precision extraction. Strategy 4 as a future enhancement.
+
+### 9.5 — The Full Handoff Flow (Concrete Example)
+
+**Scenario:** User plans in GSD, executes in OpenHands, reviews result back in GSD.
+
+```
+Step 1: Planning (GSD / Claude Code session)
+─────────────────────────────────────────────
+User: "Create a comprehensive plan to refactor the auth module to use JWTs"
+Claude: [analyzes codebase, produces detailed plan]
+       → Adapter detects plan artifact
+       → Shell shows: [▶ Execute in OpenHands] [▶ Execute in Codex]
+
+Step 2: Handoff (Shell-mediated)
+────────────────────────────────
+User clicks [▶ Execute in OpenHands]
+Shell:
+  1. Retrieves artifact from registry
+  2. Creates OpenHands session with:
+     - artifact.content as structured input (or serialized prompt)
+     - artifact.context.repository → mounted into container
+     - metadata.originSessionId → links back to GSD session
+  3. OpenHands adapter provisions sandbox, starts execution
+  4. New session appears in sidebar, visually linked to GSD session
+
+Step 3: Autonomous Execution (OpenHands session)
+────────────────────────────────────────────────
+OpenHands agent executes the plan step-by-step in sandbox
+Events stream into the shell: file edits, test runs, etc.
+User can observe but doesn't need to intervene
+
+Step 4: Result (OpenHands → artifact)
+────────────────────────────────────
+OpenHands finishes → adapter emits artifact: { type: 'diff', content: unifiedDiff }
+Shell shows: [▶ Review in GSD] [▶ Create PR]
+
+Step 5: Review (back in GSD session)
+──────────────────────────────────
+User clicks [▶ Review in GSD]
+Shell sends diff artifact into the *original* GSD session as context
+Claude: "Here's my review of the changes produced by the sandbox execution..."
+
+Full circle. Three sessions. Zero adapter coupling.
+```
+
+### 9.6 — Sidebar & UI Implications
+
+Artifact handoffs create **session chains**. The sidebar should visualize these:
+
+```
+Sidebar:
+├─ Claude Code (GSD)
+│  ├─ ● "Refactor auth plan"         ← original session
+│  │  └─ artifacts: [📋 JWT Auth Plan]
+│  └─ ● "Review sandbox changes"      ← spawned from artifact
+│
+├─ OpenHands
+│  └─ ● "Execute: JWT Auth Plan"      ← spawned from artifact
+│     ├─ origin: "Refactor auth plan" ← linked back
+│     └─ artifacts: [📄 Implementation Diff]
+```
+
+When an artifact has consumers, the event stream renderer shows **action chips** inline:
+
+```
+┌─────────────────────────────────────────────────┐
+│ 📋 Implementation Plan: JWT Auth Refactor       │
+│                                                 │
+│ 1. Extract token validation to middleware...    │
+│ 2. Replace session cookies with JWT...          │
+│ 3. Add token refresh endpoint...                │
+│                                                 │
+│ ┌────────────────┐ ┌──────────────┐             │
+│ │ ▶ OpenHands    │ │ ▶ Codex      │             │
+│ │   Execute      │ │   Execute    │             │
+│ └────────────────┘ └──────────────┘             │
+└─────────────────────────────────────────────────┘
+```
+
+### 9.7 — Why NOT Inject Tools/Instructions Into Agents
+
+The user specifically asked: "should we provide special tools or instructions into the agents?"
+
+**No, and here's why:**
+
+1. **Separation of concerns.** The agent's job is to think and produce work. The shell's job is to route work between environments. Mixing these creates a leaky abstraction.
+
+2. **Agent fragility.** Injecting tools into Claude Code via MCP is technically possible, but:
+   - The tool descriptions consume context window (every turn)
+   - The agent might call the tool at the wrong time
+   - Different models handle synthetic tools differently
+   - You'd need model-specific prompt engineering for each adapter×model combination
+
+3. **The agent can't know the state of other adapters.** Is OpenHands available right now? Is there a running sandbox? How much would it cost? These are shell-level concerns that the agent shouldn't reason about.
+
+4. **The action is fundamentally a user decision.** "Where should this plan be executed?" is a routing decision, not a reasoning decision. The user should make it, with the shell showing what's available.
+
+5. **It works both ways.** The same mechanism that hands a plan from GSD→OpenHands also hands a diff from OpenHands→GSD for review, or a PR spec from Codex→GitHub. Agent-injected tools would only work in one direction.
+
+### 9.8 — Optional Enhancement: Agent Hint
+
+There's a lightweight middle ground that doesn't compromise the architecture. Adapters can optionally include a **single-line hint** in the agent's system context:
+
+> "When you produce a structured implementation plan, the user's environment can route it to sandboxed execution environments for autonomous implementation."
+
+This doesn't inject tools. It doesn't name specific adapters. It just makes the agent aware that plans are *actionable* — so it might format them more carefully, or ask the user "Would you like me to produce a structured plan that can be executed autonomously?"
+
+The agent never calls a tool. It never knows about OpenHands. It just knows that well-structured plans have downstream value. This is the same pattern as "write clean code because it might be reviewed" — a general awareness, not a specific integration.
+
+### 9.9 — Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Who orchestrates handoffs? | **Shell** (not agents) | Agents don't know about each other |
+| How are artifacts detected? | **Adapter pattern matching** | Each adapter knows its own agent's outputs |
+| How are consumers discovered? | **Manifest declarations** | Static metadata, no runtime coupling |
+| Who initiates handoff? | **User** (via UI action) | Routing is a user decision, not agent reasoning |
+| Can agents know about handoff? | **Optional hint only** | Awareness without coupling |
+| How are sessions linked? | **Artifact provenance chain** | Each artifact records source session, consuming session links back |
+| Are handoffs reversible? | **Yes** — artifacts are immutable, sessions can be abandoned | No destructive state changes |
+
+### 9.10 — Relationship to AG-UI Protocol
+
+AG-UI defines 5 event categories. Our `artifact_produced` event maps cleanly to AG-UI's "state" event category (shared state between agent and UI). The action buttons map to AG-UI's "tool" event category (UI-initiated actions).
+
+If we emit artifacts as AG-UI-compatible state events, third-party frontends that speak AG-UI could render the same handoff actions. This keeps our system open.
+
+---
+
 ## Next Steps (Immediate)
 
 1. **Week 1:** Run Experiments A and B in parallel. Validate the two hardest unknowns: FS→UI pipeline and SDK→Event pipeline.
