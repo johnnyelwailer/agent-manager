@@ -1734,6 +1734,321 @@ If we emit artifacts as AG-UI-compatible state events, third-party frontends tha
 
 ---
 
+## Phase 10: Emerging Standards & Protocol Landscape
+
+> **Status:** Research complete (2026-02-14)
+> **Context:** What protocols and standards are shaping the agent ecosystem? Which should we build on, which should we stay compatible with, and which can we ignore?
+
+### 10.1 — The Protocol Stack
+
+The 2026 agent ecosystem has converged around a layered protocol stack. Each layer solves a different communication problem:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Layer 6: ANP (Agent Network Protocol)                       │
+│  Internet-scale agent discovery via W3C DIDs                 │
+│  Status: Early/niche — W3C Community Group stage             │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 5: A2A (Agent-to-Agent Protocol)                      │
+│  Enterprise agent coordination via Agent Cards               │
+│  Status: Production — Linux Foundation, Google-led           │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 4: ACP (Agent Communication Protocol)                 │
+│  Agent messaging — REST-based, no SDK required               │
+│  Status: Pre-alpha → Alpha — Linux Foundation, IBM/BeeAI     │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 3: AG-UI (Agent-User Interaction Protocol)            │
+│  Agent-to-frontend event streaming                           │
+│  Status: Production — CopilotKit, adopted by many frameworks │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 2: MCP (Model Context Protocol) + Extensions          │
+│  Agent-to-tool connections, MCP Apps (UI), Elicitation        │
+│  Status: De facto standard — AAIF/Linux Foundation            │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 1: A2UI (Agent-to-User Interface)                     │
+│  Declarative UI components from agents                       │
+│  Status: Preview (v0.8) — Google                             │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 0: AGENTS.md                                          │
+│  Per-repo agent instructions (Markdown)                      │
+│  Status: Widely adopted (60K+ repos) — AAIF                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Not all layers compete. They solve different problems and compose:
+- **MCP** connects agents to tools/data
+- **ACP** connects agents to agents via messaging
+- **A2A** connects agents for coordination and discovery
+- **AG-UI** connects agents to frontends
+- **A2UI** lets agents declare UI components
+- **ANP** connects agents across the open internet
+- **AGENTS.md** gives agents per-repo instructions
+
+### 10.2 — MCP: The Foundation (and Its New Extensions)
+
+MCP is now the de facto standard for agent-tool integration, with 97M+ monthly SDK downloads and governance under the Agentic AI Foundation (AAIF) at the Linux Foundation.
+
+**What we already planned for:** MCP server connections, tool discovery, tool use events.
+
+**What's new and critical:**
+
+#### MCP Apps (January 2026) — VERY HIGH IMPACT
+
+MCP Apps let tools return **interactive UI components** that render directly in the conversation. Dashboards, forms, charts, multi-step workflows — all rendered in sandboxed iframes with bidirectional JSON-RPC communication via `postMessage`.
+
+How it works:
+1. MCP tool declares `_meta.ui.resourceUri` pointing to a `ui://` resource
+2. Host fetches the resource (bundled HTML/JS)
+3. Host renders it in a sandboxed iframe
+4. UI communicates back via JSON-RPC: calling tools, updating model context
+
+Launch partners: Amplitude, Asana, Box, Canva, Clay, Figma, Hex, monday.com, Slack, Salesforce.
+Client support: Claude, ChatGPT, VS Code, Goose — developed jointly by Anthropic + OpenAI.
+
+**Impact on our shell:** This is our "adapter override renderer" from §7.4 — but standardized. Instead of each adapter providing custom React components, MCP Apps provide cross-platform interactive UIs via a standard protocol. **Our shell must be an MCP Apps host.** This means:
+- Rendering sandboxed iframes in the event stream
+- Implementing the JSON-RPC postMessage bridge
+- Supporting `callServerTool()` and `updateModelContext()` APIs from the iframe
+- Security: iframe sandboxing, user consent for UI-initiated tool calls
+
+#### MCP Elicitation (Draft) — HIGH IMPACT
+
+MCP servers can now **request user input mid-execution**. Two modes:
+- **Form mode:** Server sends a JSON schema, client renders a form, user fills it, response flows back
+- **URL mode:** Server directs user to an external URL for sensitive input (credentials, OAuth)
+
+This means: during a tool call, the MCP server can pause execution and ask the user for information. The client displays the UI, collects input, and returns it.
+
+**Impact on our shell:** We need a generic "MCP elicitation renderer" that can display form-mode schemas as dynamic forms and handle URL-mode redirects. This is a new UI surface we hadn't explicitly planned. It maps to a specialized event renderer in the event stream.
+
+#### MCP Streamable HTTP (March 2025, stable)
+
+Replaced the old HTTP+SSE dual-endpoint transport with a single HTTP endpoint supporting both POST and GET, with optional SSE upgrade. Better security (no always-on connection), resumable streams, session management.
+
+**Impact on our shell:** When we connect to remote MCP servers (inside containers, cloud VMs), we use Streamable HTTP. No architectural impact — this is a transport detail handled by the MCP SDK.
+
+#### AAIF Governance
+
+MCP is now governed by the Agentic AI Foundation under the Linux Foundation, co-founded by Anthropic, Block, and OpenAI. Platinum members include AWS, Bloomberg, Cloudflare, Google, Microsoft. Gold: Docker, IBM, JetBrains, Salesforce, Shopify, etc.
+
+**Impact:** MCP is a safe standard to build on. It won't disappear or fragment. We should treat it as foundational, not optional.
+
+### 10.3 — ACP (Agent Communication Protocol) — IBM/BeeAI
+
+ACP is a REST-based messaging protocol for agent-to-agent communication. Created by IBM's BeeAI project, now under the Linux Foundation.
+
+**Key characteristics:**
+- Pure REST (HTTP verbs) — no SDK required. Works with curl.
+- MIME-typed multipart messages — supports text, images, audio, video, binary
+- Sync mode: HTTP POST → JSON response
+- Async mode: fire-and-forget with `taskId`, poll or subscribe for progress
+- Offline discovery: agents embed metadata in distribution packages (works at scale-to-zero)
+- Dynamic discovery: agents advertise manifests, server auto-indexes
+- OTLP observability: all calls instrumented with OpenTelemetry
+- Lifecycle management: INITIALIZING → ACTIVE → DEGRADED → RETIRING → RETIRED
+- Distributed sessions via URI-based resource sharing (Redis/PostgreSQL backends)
+
+**How ACP relates to MCP:** ACP sits one layer above MCP. MCP connects agents to tools. ACP connects agents to other agents. ACP intentionally reuses MCP message types where possible — you can embed MCP payloads inside ACP messages.
+
+**Impact on our shell:**
+
+ACP's simplicity is very adapter-friendly. For any agent running on the BeeAI platform (or any ACP-compliant server), the adapter is trivial:
+```
+POST /tasks → create agent task
+GET /tasks/{id} → poll status
+GET /tasks/{id}/steps → get step results
+```
+
+ACP's offline discovery model maps directly to our adapter manifest concept — an ACP agent's metadata *is* its manifest. We could auto-generate adapter manifests from ACP agent descriptors.
+
+ACP's lifecycle management (INITIALIZING → ACTIVE → ...) maps to our session lifecycle events.
+
+**Relevance level:** MEDIUM-HIGH. Worth building an ACP adapter early — it gives us access to the entire BeeAI ecosystem plus any ACP-compliant agent. The REST simplicity means the adapter is ~50 lines of code.
+
+### 10.4 — A2A (Agent-to-Agent Protocol) — Google
+
+A2A enables peer-to-peer agent coordination using **Agent Cards** — JSON descriptors of an agent's capabilities, endpoints, and authentication requirements.
+
+**Key concepts:**
+- **Agent Cards** — JSON published at `/.well-known/agent.json` describing what the agent can do
+- **Task lifecycle** — create, query, cancel tasks across agents
+- **Streaming** — SSE-based real-time updates
+- **Push notifications** — for async task completion
+- Now under Linux Foundation governance (donated by Google, June 2025)
+
+**How A2A relates to our architecture:**
+
+Agent Cards are conceptually identical to our `AdapterManifest`. An A2A Agent Card describes:
+- `name`, `description`, `url`
+- `capabilities` (streaming, pushNotifications, stateTransitionHistory)
+- `skills` — what the agent can do
+- `authentication` — how to connect
+
+**Impact on our shell:**
+
+1. **Manifest compatibility.** Our `AdapterManifest` should be mappable to/from A2A Agent Cards. This means an adapter registered in our shell could also be discoverable via A2A, and vice versa.
+
+2. **Cross-shell agent discovery.** If our shell supports A2A, it can discover agents running in other systems — not just locally registered adapters.
+
+3. **Task delegation.** A2A's task model maps to our artifact handoff (§9). An agent in our shell could delegate a task to an A2A-compliant agent elsewhere, without needing a custom adapter.
+
+**Relevance level:** MEDIUM. A2A matters for enterprise multi-agent scenarios. Not critical for v1, but we should keep our manifest format compatible.
+
+### 10.5 — AG-UI (Agent-User Interaction Protocol)
+
+Already covered in §8.5. CopilotKit's open standard for agent-to-frontend event streaming. ~16 event types in 5 categories. Supports SSE and WebSocket. Integrations with LangGraph, CrewAI, Mastra, PydanticAI.
+
+**Updated assessment:** AG-UI is the closest existing standard to our event bus architecture. Our `AgentEvent` types should be mappable to AG-UI events. This is the protocol third-party adapters would most likely speak.
+
+### 10.6 — A2UI (Agent-to-User Interface) — Google
+
+Declarative UI protocol where agents send JSON describing UI components, and the client renders them natively. Preview (v0.8).
+
+**Key design choices:**
+- No executable code — agents cannot send JavaScript
+- Trusted component catalog — client only renders known components
+- Framework-agnostic — works with any frontend stack
+- Security-first by construction
+
+**Impact on our shell:** A2UI's component catalog model maps to our UI component library. An adapter could translate A2UI component specs into our React components. This is complementary to MCP Apps — MCP Apps use iframes (sandboxed but opaque), A2UI uses declarative specs (transparent but limited).
+
+**Relevance level:** LOW-MEDIUM for now. V0.8 preview, still evolving. Worth staying compatible but not building on yet.
+
+### 10.7 — ANP (Agent Network Protocol)
+
+Internet-scale agent communication protocol using W3C Decentralized Identifiers (DIDs). Three-layer architecture:
+1. Identity & encrypted communication (W3C DID)
+2. Meta-protocol (protocol negotiation between agents)
+3. Application protocol (semantic web, JSON-LD capability descriptions)
+
+Agent discovery uses RFC 8615 (`.well-known`), with Agent Description Protocol (ADP) documents in JSON-LD.
+
+**Relevance level:** LOW. Ambitious vision (the "HTTP of the Agentic Web"), but very early stage. W3C Community Group only. Relevant for future internet-scale agent discovery, not for our current shell architecture.
+
+### 10.8 — AGENTS.md
+
+OpenAI-originated, now under AAIF. A Markdown file placed at the root of a repository providing agent-specific instructions — setup commands, testing workflows, coding style, PR guidelines. Adopted by 60,000+ projects.
+
+**Key features:**
+- Just Markdown — no schema, no validation
+- Nested support — monorepos can have per-package AGENTS.md files
+- Closest file wins — directory-tree precedence
+- Cross-tool — supported by Codex, Jules, Cursor, Copilot, Gemini CLI, and more
+
+**Relationship to CLAUDE.md:** Same concept, different filename. Claude Code uses CLAUDE.md. Codex/Jules use AGENTS.md. Both are now under AAIF. Likely to converge or coexist with reader support for both.
+
+**Impact on our shell:** When initializing a session in a repository context, the shell should:
+1. Look for AGENTS.md and/or CLAUDE.md (and any adapter-specific variants)
+2. Pass the content to the adapter as part of session config
+3. Let the adapter decide how to inject it (system prompt, file context, etc.)
+
+This is trivial to implement and high-value — ensures agents in our shell respect the repo's conventions.
+
+### 10.9 — Agentic AI Foundation (AAIF)
+
+The governance umbrella that matters most. Under Linux Foundation. Co-founded by Anthropic, Block, OpenAI.
+
+**Projects under AAIF:**
+- MCP (Model Context Protocol) — from Anthropic
+- goose (agent framework) — from Block
+- AGENTS.md — from OpenAI
+
+**Members:** AWS, Bloomberg, Cloudflare, Google, Microsoft (platinum). Docker, IBM, JetBrains, Oracle, Salesforce, SAP, Shopify, Snowflake, Temporal (gold).
+
+**Also under Linux Foundation (separate from AAIF):**
+- A2A (Agent-to-Agent) — from Google
+- ACP (Agent Communication Protocol) — from IBM/BeeAI
+
+**What this means:** The major protocols (MCP, A2A, ACP) are all under Linux Foundation governance. They will converge rather than fragment. Building on these is a safe long-term bet.
+
+### 10.10 — The E2B Agent Protocol (Historical)
+
+E2B/AI Engineer Foundation's early attempt (2023) at a standard REST API for agents. Simple OpenAPI spec: create tasks, execute steps, manage artifacts. ~834 GitHub stars.
+
+**Status:** Largely stale since mid-2024. Superseded by MCP + A2A + ACP. E2B pivoted to sandbox infrastructure.
+
+**Relevance level:** NONE. Historical interest only. The ecosystem moved to richer protocols.
+
+---
+
+### 10.11 — Impact on Our Architecture: What to Build On
+
+#### Must Build On (foundational):
+
+| Standard | Why | How |
+|----------|-----|-----|
+| **MCP** | De facto standard, universal adoption | Our shell is an MCP client. All adapters can expose MCP tools. |
+| **MCP Apps** | Interactive UI from tools, joint Anthropic+OpenAI spec | Shell must be an MCP Apps host (iframe rendering, JSON-RPC bridge) |
+| **AGENTS.md / CLAUDE.md** | 60K+ repos, trivial to support | Read on session init, pass to adapter |
+
+#### Should Stay Compatible With (interop):
+
+| Standard | Why | How |
+|----------|-----|-----|
+| **AG-UI** | Closest match to our event bus, framework interop | Our AgentEvent types should map to/from AG-UI events |
+| **ACP** | Simple REST adapter for BeeAI ecosystem | Build an ACP adapter (~50 LOC) as proof of interop |
+| **A2A Agent Cards** | Our manifest ≈ Agent Cards | Ensure AdapterManifest can round-trip to Agent Card JSON |
+| **MCP Elicitation** | User input mid-execution, draft spec | Build form renderer for elicitation requests |
+
+#### Watch But Don't Build On Yet:
+
+| Standard | Why | When to Revisit |
+|----------|-----|-----------------|
+| **A2UI** | Google preview v0.8, still evolving | When it reaches v1 and has client implementations |
+| **ANP** | Very early, W3C Community Group | When there's real adoption beyond the spec authors |
+
+### 10.12 — MCP Apps vs. Our Adapter Override Renderers
+
+This deserves special attention because MCP Apps directly overlaps with our §7.4 "adapter override renderer" design.
+
+**Our original design (§7.4):** Each adapter can optionally provide custom React components that override the default event renderer. The shell renders these components directly.
+
+**MCP Apps approach:** Tools return interactive UI as sandboxed HTML/JS in iframes. Cross-platform (works in Claude, ChatGPT, VS Code, etc.). Communication via JSON-RPC postMessage.
+
+**Resolution — both are needed, at different layers:**
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Adapter Override Renderers (React components)             │
+│  For: adapter-specific visualization of events             │
+│  e.g., custom diff viewer, agent topology diagram,         │
+│       plan approval flow, checkpoint timeline              │
+│  Runs in our process — full access to shell state          │
+├────────────────────────────────────────────────────────────┤
+│  MCP Apps (sandboxed iframes)                              │
+│  For: tool-provided interactive UIs                        │
+│  e.g., Figma preview, Jira board, Amplitude dashboard,     │
+│       database explorer, API tester                        │
+│  Runs in iframe — isolated, cross-platform                 │
+└────────────────────────────────────────────────────────────┘
+```
+
+Adapter override renderers handle shell-level concerns (event visualization, workflow UI). MCP Apps handle tool-level concerns (external service UIs). Our shell renders both.
+
+### 10.13 — Key Findings Summary
+
+1. **MCP is the foundation.** Under AAIF/Linux Foundation governance with every major AI company as a member. Build on it with confidence.
+
+2. **MCP Apps is the biggest UI implication.** Tools can now return interactive UIs. Our shell must host these. This partially solves the "adapter override renderer" problem via a cross-platform standard.
+
+3. **MCP Elicitation is a new UI surface.** Mid-execution user input requests need form rendering. Plan for this in the event stream renderer.
+
+4. **ACP is the simplest agent-to-agent protocol.** Pure REST, no SDK. Ideal for building adapters to BeeAI and other ACP-compliant agent platforms. Very adapter-friendly.
+
+5. **A2A Agent Cards ≈ our AdapterManifest.** Keep them compatible. This gives us free interop with the Google/enterprise agent ecosystem.
+
+6. **AG-UI ≈ our event bus.** Keep our event types mappable. This gives us free interop with CopilotKit and the LangGraph/CrewAI frontend ecosystem.
+
+7. **AGENTS.md is table stakes.** Trivial to read, high value. Support it alongside CLAUDE.md on session init.
+
+8. **The Linux Foundation is the governance center of gravity.** MCP, A2A, ACP, AGENTS.md, goose — all there. The fragmentation risk is low.
+
+9. **The E2B Agent Protocol is dead.** Don't build on it.
+
+10. **ANP and A2UI are worth watching, not building on.** Too early.
+
+---
+
 ## Next Steps (Immediate)
 
 1. **Week 1:** Run Experiments A and B in parallel. Validate the two hardest unknowns: FS→UI pipeline and SDK→Event pipeline.
