@@ -1743,23 +1743,33 @@ If we emit artifacts as AG-UI-compatible state events, third-party frontends tha
 
 The 2026 agent ecosystem has converged around a layered protocol stack. Each layer solves a different communication problem:
 
+**Note:** "ACP" is an overloaded acronym. Two entirely different protocols share it:
+- **Agent Client Protocol** (Zed/Google) — editor↔agent communication. The "LSP for AI agents." **This one is critical for us.**
+- **Agent Communication Protocol** (IBM/BeeAI) — agent↔agent messaging. REST-based. Less directly relevant.
+
+This document uses "ACP" to mean the **Zed Agent Client Protocol** unless explicitly stated otherwise. IBM's protocol is referred to as "IBM ACP" where mentioned.
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Layer 6: ANP (Agent Network Protocol)                       │
+│  Layer 7: ANP (Agent Network Protocol)                       │
 │  Internet-scale agent discovery via W3C DIDs                 │
 │  Status: Early/niche — W3C Community Group stage             │
 ├──────────────────────────────────────────────────────────────┤
-│  Layer 5: A2A (Agent-to-Agent Protocol)                      │
+│  Layer 6: A2A (Agent-to-Agent Protocol)                      │
 │  Enterprise agent coordination via Agent Cards               │
 │  Status: Production — Linux Foundation, Google-led           │
 ├──────────────────────────────────────────────────────────────┤
-│  Layer 4: ACP (Agent Communication Protocol)                 │
-│  Agent messaging — REST-based, no SDK required               │
+│  Layer 5: IBM ACP (Agent Communication Protocol)             │
+│  Agent↔agent messaging — REST-based, no SDK required         │
 │  Status: Pre-alpha → Alpha — Linux Foundation, IBM/BeeAI     │
 ├──────────────────────────────────────────────────────────────┤
-│  Layer 3: AG-UI (Agent-User Interaction Protocol)            │
+│  Layer 4: AG-UI (Agent-User Interaction Protocol)            │
 │  Agent-to-frontend event streaming                           │
 │  Status: Production — CopilotKit, adopted by many frameworks │
+├──────────────────────────────────────────────────────────────┤
+│  Layer 3: ACP (Agent Client Protocol) ★ MOST RELEVANT       │
+│  Editor↔agent communication — "LSP for AI agents"            │
+│  Status: Production — Zed + Google + JetBrains, registry live│
 ├──────────────────────────────────────────────────────────────┤
 │  Layer 2: MCP (Model Context Protocol) + Extensions          │
 │  Agent-to-tool connections, MCP Apps (UI), Elicitation        │
@@ -1777,7 +1787,8 @@ The 2026 agent ecosystem has converged around a layered protocol stack. Each lay
 
 Not all layers compete. They solve different problems and compose:
 - **MCP** connects agents to tools/data
-- **ACP** connects agents to agents via messaging
+- **ACP** (Zed) connects editors/shells to agents ← **our layer**
+- **IBM ACP** connects agents to agents via messaging
 - **A2A** connects agents for coordination and discovery
 - **AG-UI** connects agents to frontends
 - **A2UI** lets agents declare UI components
@@ -1833,37 +1844,85 @@ MCP is now governed by the Agentic AI Foundation under the Linux Foundation, co-
 
 **Impact:** MCP is a safe standard to build on. It won't disappear or fragment. We should treat it as foundational, not optional.
 
-### 10.3 — ACP (Agent Communication Protocol) — IBM/BeeAI
+### 10.3 — ACP (Agent Client Protocol) — Zed/Google ★ CRITICAL
 
-ACP is a REST-based messaging protocol for agent-to-agent communication. Created by IBM's BeeAI project, now under the Linux Foundation.
+**This is the most directly relevant protocol to our project.** The Agent Client Protocol is essentially doing what our adapter layer does — it's the **"LSP for AI coding agents."** Pioneered by Zed, co-developed with Google (Gemini CLI was the reference implementation), now adopted by JetBrains.
 
-**Key characteristics:**
-- Pure REST (HTTP verbs) — no SDK required. Works with curl.
-- MIME-typed multipart messages — supports text, images, audio, video, binary
-- Sync mode: HTTP POST → JSON response
-- Async mode: fire-and-forget with `taskId`, poll or subscribe for progress
-- Offline discovery: agents embed metadata in distribution packages (works at scale-to-zero)
-- Dynamic discovery: agents advertise manifests, server auto-indexes
-- OTLP observability: all calls instrumented with OpenTelemetry
-- Lifecycle management: INITIALIZING → ACTIVE → DEGRADED → RETIRING → RETIRED
-- Distributed sessions via URI-based resource sharing (Redis/PostgreSQL backends)
+**What it does:** Standardizes bidirectional communication between code editors and AI coding agents. Any agent that speaks ACP can plug into any ACP-compatible editor. Any editor that speaks ACP can use any ACP-compatible agent.
 
-**How ACP relates to MCP:** ACP sits one layer above MCP. MCP connects agents to tools. ACP connects agents to other agents. ACP intentionally reuses MCP message types where possible — you can embed MCP payloads inside ACP messages.
+**Technical architecture:**
+- **Transport:** JSON-RPC 2.0 over stdio (newline-delimited JSON). Editor spawns agent as subprocess.
+- **Protocol layers:** Transport (NDJSON/stdio) → Protocol (JSON-RPC 2.0) → Connection (init, auth, sessions) → Session (conversation contexts) → Application (agent/client logic)
+- **Initialization:** Client sends `initialize` with `protocolVersion`, `clientCapabilities`, `clientInfo`. Agent responds with its capabilities.
+- **MCP integration:** On session start, the editor passes available MCP server endpoints and credentials to the agent, giving it a toolkit of capabilities.
+- **Libraries:** TypeScript (`@zed-industries/agentic-coding-protocol`) and Rust
+- **License:** Apache 2.0
 
-**Impact on our shell:**
+**Agents with ACP support (as of early 2026):**
+Claude Code, Codex CLI, Gemini CLI, GitHub Copilot CLI, Goose, OpenHands, Augment Code, Blackbox AI, Docker cagent, Kimi CLI, Mistral Vibe, OpenCode, Qoder CLI, Qwen Code, and more.
 
-ACP's simplicity is very adapter-friendly. For any agent running on the BeeAI platform (or any ACP-compliant server), the adapter is trivial:
+**Editors with ACP support:**
+Zed (native), JetBrains (all IDEs), Neovim (CodeCompanion, avante.nvim), Emacs (agent-shell), marimo notebooks, Kiro.
+
+**ACP Registry (January 2026):**
+A centralized registry where agent developers register once and every ACP client can discover and install. Built-in to Zed and JetBrains IDEs. Deprecates Zed's older agent server extensions.
+
+**How Claude Code integrates via ACP:**
+Zed built an open-source adapter (`claude-code-acp`) that wraps the Claude Code SDK and translates its interactions into ACP's JSON-RPC format. The adapter bridges between Claude Code and ACP's standardized interface, allowing Claude Code to run as an independent process while the editor provides the UI.
+
+**The fundamental question this raises for our project:**
+
+Our `Adapter` interface is conceptually identical to ACP:
 ```
-POST /tasks → create agent task
-GET /tasks/{id} → poll status
-GET /tasks/{id}/steps → get step results
+Our Adapter                          ACP
+─────────────                        ───
+AdapterManifest                  ≈   Agent capabilities (init response)
+startSession(config, onEvent)    ≈   ACP session creation + streaming
+SessionHandle.interrupt()        ≈   ACP cancellation
+checkAvailability()              ≈   ACP initialization handshake
+onEvent callback                 ≈   JSON-RPC notifications (streaming)
 ```
 
-ACP's offline discovery model maps directly to our adapter manifest concept — an ACP agent's metadata *is* its manifest. We could auto-generate adapter manifests from ACP agent descriptors.
+**Three strategic options:**
 
-ACP's lifecycle management (INITIALIZING → ACTIVE → ...) maps to our session lifecycle events.
+1. **Our shell IS an ACP client.** We implement the ACP client protocol. Every ACP-compatible agent works in our shell automatically. We get Claude Code, Codex, Gemini, Goose, etc. for free via the existing ACP adapters. Our `Adapter` interface becomes a thin wrapper over ACP.
 
-**Relevance level:** MEDIUM-HIGH. Worth building an ACP adapter early — it gives us access to the entire BeeAI ecosystem plus any ACP-compliant agent. The REST simplicity means the adapter is ~50 lines of code.
+2. **Our shell speaks ACP + our own extensions.** ACP handles the editor↔agent basics. We add our own extensions for: artifact bus (§9), execution model metadata (§8), multi-adapter coordination. ACP becomes our transport layer; our adapter interface adds the orchestration layer.
+
+3. **Our shell has its own adapter interface, with an ACP bridge adapter.** One of our adapters is a generic "ACP Agent" adapter that wraps any ACP-compliant agent. Other adapters (SDK-based, container-based, cloud-based) use our native interface.
+
+**Recommendation:** Option 2. ACP is battle-tested for the editor↔agent communication pattern. We don't need to reinvent that. But ACP doesn't cover: multi-adapter orchestration, artifact handoff between sessions, execution model metadata, sandbox/cloud lifecycle management. Those are our extensions on top.
+
+**Impact on our adapter interface:**
+
+```typescript
+// Our adapter interface maps to ACP concepts:
+interface Adapter {
+  readonly manifest: AdapterManifest;     // ≈ ACP agent capabilities
+  startSession(config, onEvent): Promise<SessionHandle>;  // ≈ ACP session + streaming
+  checkAvailability(): Promise<string | null>;  // ≈ ACP initialize handshake
+}
+
+// Plus our extensions that ACP doesn't cover:
+interface AdapterManifest {
+  // ... standard fields (mappable to ACP capabilities) ...
+  executionModel: ExecutionModelDescriptor;  // §8 — not in ACP
+  produces?: ArtifactType[];                 // §9 — not in ACP
+  consumes?: ArtifactConsumption[];          // §9 — not in ACP
+}
+```
+
+**Relevance level:** VERY HIGH. This is the closest existing standard to what we're building. We should build on it, not beside it.
+
+### 10.3b — IBM ACP (Agent Communication Protocol) — IBM/BeeAI
+
+**Note:** Different protocol, same acronym. IBM's ACP is for agent-to-agent messaging, not editor-to-agent communication.
+
+REST-based messaging protocol for agent-to-agent communication. Created by IBM's BeeAI project, now under the Linux Foundation.
+
+Key characteristics: pure REST (no SDK required), MIME-typed multipart messages, sync + async modes with task IDs, offline/dynamic discovery, OpenTelemetry observability, lifecycle management.
+
+**Relevance level:** MEDIUM. Useful for building adapters to BeeAI ecosystem agents. The REST simplicity makes adapters trivial. But this is an agent-to-agent protocol — our shell-to-agent communication is better served by Zed's ACP.
 
 ### 10.4 — A2A (Agent-to-Agent Protocol) — Google
 
@@ -1957,9 +2016,12 @@ The governance umbrella that matters most. Under Linux Foundation. Co-founded by
 
 **Also under Linux Foundation (separate from AAIF):**
 - A2A (Agent-to-Agent) — from Google
-- ACP (Agent Communication Protocol) — from IBM/BeeAI
+- IBM ACP (Agent Communication Protocol) — from IBM/BeeAI
 
-**What this means:** The major protocols (MCP, A2A, ACP) are all under Linux Foundation governance. They will converge rather than fragment. Building on these is a safe long-term bet.
+**Also notable (not yet under a foundation):**
+- ACP (Agent Client Protocol) — from Zed, co-developed with Google, adopted by JetBrains
+
+**What this means:** The major protocols (MCP, A2A, Zed ACP) are either under Linux Foundation governance or have multi-company backing. They will converge rather than fragment. Building on these is a safe long-term bet.
 
 ### 10.10 — The E2B Agent Protocol (Historical)
 
@@ -1977,7 +2039,8 @@ E2B/AI Engineer Foundation's early attempt (2023) at a standard REST API for age
 
 | Standard | Why | How |
 |----------|-----|-----|
-| **MCP** | De facto standard, universal adoption | Our shell is an MCP client. All adapters can expose MCP tools. |
+| **ACP** (Zed) | Our adapter layer ≈ ACP. Battle-tested. 20+ agents, 5+ editors. | **Our shell is an ACP client.** Every ACP agent works automatically. Extend with our own capabilities (artifacts, execution models). |
+| **MCP** | De facto standard for tools, universal adoption | Our shell is an MCP client. MCP servers passed to agents on session init (per ACP convention). |
 | **MCP Apps** | Interactive UI from tools, joint Anthropic+OpenAI spec | Shell must be an MCP Apps host (iframe rendering, JSON-RPC bridge) |
 | **AGENTS.md / CLAUDE.md** | 60K+ repos, trivial to support | Read on session init, pass to adapter |
 
@@ -1986,9 +2049,9 @@ E2B/AI Engineer Foundation's early attempt (2023) at a standard REST API for age
 | Standard | Why | How |
 |----------|-----|-----|
 | **AG-UI** | Closest match to our event bus, framework interop | Our AgentEvent types should map to/from AG-UI events |
-| **ACP** | Simple REST adapter for BeeAI ecosystem | Build an ACP adapter (~50 LOC) as proof of interop |
 | **A2A Agent Cards** | Our manifest ≈ Agent Cards | Ensure AdapterManifest can round-trip to Agent Card JSON |
 | **MCP Elicitation** | User input mid-execution, draft spec | Build form renderer for elicitation requests |
+| **IBM ACP** | REST adapter for BeeAI ecosystem | Build a bridge adapter if needed |
 
 #### Watch But Don't Build On Yet:
 
@@ -2027,25 +2090,29 @@ Adapter override renderers handle shell-level concerns (event visualization, wor
 
 ### 10.13 — Key Findings Summary
 
-1. **MCP is the foundation.** Under AAIF/Linux Foundation governance with every major AI company as a member. Build on it with confidence.
+1. **Zed's ACP (Agent Client Protocol) is the most directly relevant standard.** It's literally "LSP for AI coding agents" — the exact problem our adapter layer solves. 20+ agents already speak it. Zed, JetBrains, Neovim, Emacs support it. **Our shell should be an ACP client**, extended with our own capabilities (artifact bus, execution models, multi-adapter orchestration).
 
-2. **MCP Apps is the biggest UI implication.** Tools can now return interactive UIs. Our shell must host these. This partially solves the "adapter override renderer" problem via a cross-platform standard.
+2. **Our adapter interface maps cleanly to ACP.** `AdapterManifest` ≈ ACP capabilities. `startSession()` ≈ ACP session creation. `onEvent` ≈ ACP streaming notifications. `checkAvailability()` ≈ ACP initialization. We add: artifact types, execution model metadata, extension interfaces (sandbox, async, planning).
 
-3. **MCP Elicitation is a new UI surface.** Mid-execution user input requests need form rendering. Plan for this in the event stream renderer.
+3. **MCP is the tool-layer foundation.** Under AAIF/Linux Foundation governance with every major AI company as a member. Build on it with confidence.
 
-4. **ACP is the simplest agent-to-agent protocol.** Pure REST, no SDK. Ideal for building adapters to BeeAI and other ACP-compliant agent platforms. Very adapter-friendly.
+4. **MCP Apps is the biggest UI implication.** Tools can now return interactive UIs in sandboxed iframes. Our shell must host these. This partially solves the "adapter override renderer" problem via a cross-platform standard.
 
-5. **A2A Agent Cards ≈ our AdapterManifest.** Keep them compatible. This gives us free interop with the Google/enterprise agent ecosystem.
+5. **MCP Elicitation is a new UI surface.** Mid-execution user input requests need form rendering. Plan for this in the event stream renderer.
 
-6. **AG-UI ≈ our event bus.** Keep our event types mappable. This gives us free interop with CopilotKit and the LangGraph/CrewAI frontend ecosystem.
+6. **ACP + MCP are complementary.** ACP handles editor↔agent communication. MCP handles agent↔tool connections. ACP sessions pass MCP server endpoints to agents on init. Our shell implements both.
 
-7. **AGENTS.md is table stakes.** Trivial to read, high value. Support it alongside CLAUDE.md on session init.
+7. **AG-UI ≈ our event bus.** Keep our event types mappable. This gives us free interop with CopilotKit and the LangGraph/CrewAI frontend ecosystem.
 
-8. **The Linux Foundation is the governance center of gravity.** MCP, A2A, ACP, AGENTS.md, goose — all there. The fragmentation risk is low.
+8. **AGENTS.md is table stakes.** Trivial to read, high value. Support it alongside CLAUDE.md on session init.
 
-9. **The E2B Agent Protocol is dead.** Don't build on it.
+9. **The ACP Registry is agent discovery solved.** Instead of building our own adapter discovery, we can leverage the ACP Registry (already live in Zed + JetBrains). Users install agents once, they work everywhere.
 
-10. **ANP and A2UI are worth watching, not building on.** Too early.
+10. **"ACP" is a confusingly overloaded acronym.** Zed's Agent Client Protocol (editor↔agent) ≠ IBM's Agent Communication Protocol (agent↔agent). Both are legitimate. Context matters.
+
+11. **The E2B Agent Protocol is dead.** Don't build on it.
+
+12. **ANP and A2UI are worth watching, not building on.** Too early.
 
 ---
 
