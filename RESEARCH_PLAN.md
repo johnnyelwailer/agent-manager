@@ -1072,6 +1072,271 @@ The adapter ID is shown as the parent group label, not repeated on every session
 
 ---
 
+## Phase 8: Execution Model Landscape & Adapter Impact
+
+> **Status:** Research complete (2026-02-14)
+> **Context:** What agent execution models exist beyond CLI wrapping, and how do they affect our adapter contracts, event system, and UI?
+
+### 8.1 — Execution Model Taxonomy
+
+The 2026 agent landscape has five distinct execution models. Our adapter architecture must handle all of them without becoming a lowest-common-denominator system.
+
+#### Model 1: Local CLI Process
+
+What we support today. Agent runs as a child process on the user's machine.
+
+| Aspect | Detail |
+|--------|--------|
+| **Examples** | Claude Code CLI, Aider, Cline CLI, Roo Code CLI |
+| **Execution** | `child_process.spawn()` on user's machine |
+| **Communication** | stdout/stderr, NDJSON streaming |
+| **State** | Local filesystem, process memory |
+| **Observation** | Rich (Claude Agent SDK stream) to lossy (stdout parsing) |
+| **Adapter complexity** | LOW — spawn process, parse output |
+| **Latency** | Immediate — events stream in real-time |
+
+#### Model 2: Local SDK / In-Process
+
+Agent runs as a library call within our process (or a tightly coupled sidecar).
+
+| Aspect | Detail |
+|--------|--------|
+| **Examples** | Claude Agent SDK (TS `query()` / V2 `createSession()`), OpenAI Agents SDK (`Runner.run_streamed()`), LangGraph, CrewAI, PydanticAI |
+| **Execution** | In-process async iterator or subprocess with IPC |
+| **Communication** | Direct callbacks, async generators, event emitters |
+| **State** | In-memory, with optional persistence (LangGraph checkpointers, Claude session resume) |
+| **Observation** | RICH — full streaming: text deltas, tool calls, agent handoffs, cost updates |
+| **Adapter complexity** | LOW-MEDIUM — import library, register callbacks, normalize events |
+
+Key systems:
+- **Claude Agent SDK V2** — `createSession()` / `resumeSession()` with `send()` / `stream()` cycle. Session persistence via Anthropic servers. Fork support. Hooks system (12 event types in TS).
+- **OpenAI Agents SDK** — `Runner.run_streamed()` emits 3 event types: `RawResponsesStreamEvent` (token deltas), `RunItemStreamEvent` (tool calls, outputs), `AgentUpdatedStreamEvent` (handoffs). Provider-agnostic, supports 100+ LLMs.
+- **LangGraph 1.0** — DAG-based execution with automatic checkpointing at every superstep. Backends: in-memory, SQLite, PostgreSQL, MongoDB. Streaming: LLM tokens, tool calls, state updates, node transitions. Time-travel debugging. Human-in-the-loop pauses with durable state.
+- **CrewAI** — Dual model: **Crews** (autonomous agent teams with role-based delegation) + **Flows** (event-driven orchestration with conditional branching). Sequential, parallel, and hierarchical execution modes.
+
+#### Model 3: Container / Sandbox
+
+Agent runs inside an isolated container or microVM. The host manages the container lifecycle.
+
+| Aspect | Detail |
+|--------|--------|
+| **Examples** | OpenHands, SWE-Agent/SWE-ReX, E2B, Daytona |
+| **Execution** | Docker container, Firecracker microVM, or namespace isolation |
+| **Communication** | REST API inside container (OpenHands), WebSocket from host, or command output |
+| **State** | Container filesystem (ephemeral), optional persistent volumes, forkable snapshots |
+| **Observation** | MEDIUM — event stream (OpenHands) or command output (SWE-ReX) |
+| **Adapter complexity** | MEDIUM — container lifecycle management + event bridge |
+
+Key systems:
+- **OpenHands V1 SDK** — Event-sourced architecture: all interactions are immutable events appended to a log. Docker sandbox runs REST API server internally. `BaseWorkspace` abstraction: `LocalWorkspace` (in-process) or `RemoteWorkspace` (Docker/API) — same agent code, different environments. REST/WebSocket server for remote execution. Built-in VSCode IDE, VNC desktop, Chromium browser for human inspection.
+- **E2B** — Firecracker microVMs, ~150ms startup. Python & TS SDKs. `Sandbox` class with `run_code()`, `install_pkg()`, `create_file()`. Streaming stdout/stderr. Desktop sandbox variant for computer-use agents (Manus). Long-running sandboxes up to 24h with pause/resume.
+- **Daytona** — 27ms sandbox startup (fastest). Declarative image builders — agent describes dependencies, Daytona builds Docker image on the fly. **Fork/branch execution**: agent hits decision point, forks sandbox into parallel branches, evaluates alternatives, snapshots promising branches. Python & TS SDKs. Apache 2 licensed.
+- **SWE-ReX** — Platform abstraction layer: same agent code runs on Docker, AWS Fargate, Modal, or local. Massively parallel. Powers SWE-agent. Interactive shell sessions (ipython, gdb) alongside bash.
+
+#### Model 4: Cloud VM (Remote, Async)
+
+Agent runs on a vendor-managed VM in the cloud. Results arrive asynchronously, often as a PR.
+
+| Aspect | Detail |
+|--------|--------|
+| **Examples** | OpenAI Codex Cloud, Google Jules, Devin, Cursor Background Agents, GitHub Copilot Coding Agent |
+| **Execution** | Vendor-managed VM/container in the cloud |
+| **Communication** | REST API + polling/webhooks, limited streaming |
+| **State** | Vendor-managed, session-scoped, often git-backed |
+| **Observation** | LIMITED-MEDIUM — poll for status, traces (Codex), session logs, final PR |
+| **Adapter complexity** | MEDIUM-HIGH — polling, async results, latency, plan approval flows |
+
+Key systems:
+- **OpenAI Codex Cloud** — Isolated containers, internet disabled during execution. gpt-5.3-codex model. Traces capture every prompt, tool call, handoff. Max 6 sub-agents per run. Network sandbox proxy with policy enforcement. Steering APIs for active turns. Results delivered as code changes + terminal logs.
+- **Google Jules** — Cloud VMs **with internet access**. Plan-then-execute flow: analyzes codebase → generates plan → user approves → implements → creates PR. [Jules API](https://developers.google.com/jules/api) with Session (block of work) and Activity (individual events) concepts. Async by design. CLI tool (`jules-tools`) for terminal-based interaction.
+- **Devin** — Full VM with shell, code editor, and browser. Agent Compute Units (ACUs) as billing metric. API for batch sessions. Interactive planning, codebase search (Devin Search), auto-generated wikis (DeepWiki). Senior at understanding code, junior at execution.
+- **Cursor Background Agents** — Ubuntu VMs with internet access, per-task Docker support. Subagent system for parallel specialized work. CLI-to-cloud handoff (push local chat to cloud agent). [Background Agents API](https://docs.cursor.com) for programmatic lifecycle management. Token-based pricing.
+- **GitHub Copilot Coding Agent** — GitHub Actions-powered environment. Triggered by issue assignment or chat. Pushes to `copilot/` branches only. Draft PR as output. Session logs for tracking. GA for all paid Copilot plans.
+- **Amazon Q Developer** — IDE/CLI-integrated, cloud-assisted. Plan-then-execute with approval. Self-healing test loops. Multi-repo awareness. Built on Amazon Bedrock (multi-FM routing). 1000 agentic requests/month on Pro tier.
+
+#### Model 5: Multi-Agent Orchestration Frameworks
+
+Framework manages a topology of agents, not just one. Adapters must surface the topology, not just individual sessions.
+
+| Aspect | Detail |
+|--------|--------|
+| **Examples** | LangGraph subgraphs, CrewAI Crews, AutoGen, Mastra, AWS CLI Agent Orchestrator |
+| **Execution** | Framework manages multiple agent lifecycles |
+| **Communication** | Framework event system (streaming + checkpoints) |
+| **State** | Framework-managed with graph-level checkpointing |
+| **Observation** | RICH — per-agent and per-graph events, state snapshots |
+| **Adapter complexity** | MEDIUM — bridge framework events + surface agent topology |
+
+---
+
+### 8.2 — Impact on Adapter Contracts
+
+Our current `Adapter` interface assumes Model 1 (local CLI process). To support the full landscape without bloating the base contract, we should use **optional extension interfaces**.
+
+#### Current interface (sufficient for Models 1 & 2):
+```typescript
+interface Adapter {
+  readonly manifest: AdapterManifest;
+  startSession(config: SessionConfig, onEvent: (event: AgentEvent) => void): Promise<SessionHandle>;
+  checkAvailability(): Promise<string | null>;
+}
+```
+
+#### Proposed extension interfaces:
+
+```typescript
+// For container/sandbox adapters (Model 3)
+interface SandboxedAdapter extends Adapter {
+  provisionEnvironment(config: EnvironmentConfig): Promise<EnvironmentHandle>;
+  snapshotEnvironment(envId: string): Promise<SnapshotId>;
+  forkEnvironment(envId: string): Promise<EnvironmentHandle>;
+  destroyEnvironment(envId: string): Promise<void>;
+}
+
+// For cloud/async adapters (Model 4)
+interface AsyncAdapter extends Adapter {
+  pollSession(sessionId: string): Promise<SessionStatus>;
+  getSessionResult(sessionId: string): Promise<SessionResult>;
+  getSessionLogs(sessionId: string): Promise<string>;
+}
+
+// For plan-then-execute adapters (Models 3 & 4)
+interface PlanningAdapter extends Adapter {
+  approvePlan(sessionId: string, planId: string): Promise<void>;
+  rejectPlan(sessionId: string, planId: string, reason?: string): Promise<void>;
+}
+
+// For multi-agent frameworks (Model 5)
+interface OrchestrationAdapter extends Adapter {
+  getTopology(sessionId: string): Promise<AgentTopology>;
+  getSubagentStatus(sessionId: string, agentId: string): Promise<SubagentStatus>;
+}
+```
+
+#### New execution model field in manifest:
+
+```typescript
+interface AdapterManifest {
+  // ... existing fields ...
+  capabilities: AgentCapabilities;
+  executionModel: {
+    type: 'local-cli' | 'local-sdk' | 'container' | 'cloud-vm' | 'orchestration';
+    sandbox: boolean;          // runs in isolated environment
+    remote: boolean;           // executes on a different machine
+    async: boolean;            // results delivered asynchronously
+    forking: boolean;          // can fork execution state
+    planApproval: boolean;     // proposes plans before executing
+    producesArtifacts: boolean; // output is a PR/diff, not just an event stream
+  };
+}
+```
+
+---
+
+### 8.3 — Impact on Event System
+
+New event types needed for Models 3-5:
+
+| Event | When | Model |
+|-------|------|-------|
+| `environment_provisioning` | Sandbox/VM is being created | 3, 4 |
+| `environment_ready` | Sandbox/VM is up and ready | 3, 4 |
+| `environment_destroyed` | Sandbox/VM torn down | 3, 4 |
+| `plan_proposed` | Agent proposes a plan for approval | 3, 4 |
+| `plan_approved` | User approved the plan | 3, 4 |
+| `plan_rejected` | User rejected the plan | 3, 4 |
+| `checkpoint_created` | State snapshot saved | 3, 5 |
+| `fork_created` | Execution branched | 3 |
+| `pr_created` | Pull request opened | 4 |
+| `pr_updated` | PR received new commits | 4 |
+| `agent_topology_changed` | Sub-agents added/removed/handoff | 5 |
+
+These extend the existing `AgentEvent` discriminated union. The UI can handle them progressively — unknown event types are simply not rendered.
+
+---
+
+### 8.4 — Impact on UI
+
+#### New UI surfaces needed per execution model:
+
+**Container/Sandbox (Model 3):**
+- Environment status indicator (provisioning → ready → destroyed)
+- Container logs viewer (separate from agent event stream)
+- Fork/branch visualization (Daytona: parallel execution paths)
+- Environment resource usage (CPU, memory, disk)
+
+**Cloud VM / Async (Model 4):**
+- Plan approval flow — agent proposes plan, user reviews + approves/rejects
+- Async notification system — agent takes minutes/hours, user gets notified on completion
+- PR integration panel — diff view, CI status, review state, merge button
+- Session log viewer — full terminal output from the remote VM
+
+**Orchestration (Model 5):**
+- Agent topology diagram — which agents are active, how they're connected
+- Per-agent event streams — drill into individual agents within a crew/graph
+- Checkpoint timeline — visualize execution checkpoints, enable time-travel
+
+#### Mapping to AppShell design decisions:
+
+All these surfaces fit within the existing AppShell architecture:
+- **Sidebar nav tree**: Environment status, plan approval badges, PR counts all appear as metadata on adapter/session nodes
+- **Default renderers**: Event stream renderer handles new event types progressively
+- **Adapter override renderers**: OpenHands could provide its own embedded VSCode/VNC viewer. Devin could show its interactive planning UI. These use the "default renderer with adapter override" pattern from §7.4.
+- **Multi-adapter concurrency**: A local Claude Code session and a cloud Codex session run simultaneously. Shell groups them under their respective adapter headers per §7.2.
+
+---
+
+### 8.5 — Protocol Alignment
+
+Three emerging protocols are relevant to our architecture:
+
+#### AG-UI (Agent-User Interaction Protocol)
+CopilotKit's open standard for agent-frontend communication. Event-based, uses SSE or WebSocket. ~16 event types in 5 categories. Integrates with LangGraph, CrewAI, Mastra, PydanticAI.
+
+**Our alignment**: Our `AgentEvent` system is conceptually similar. We should ensure our event types can map to/from AG-UI events, enabling framework adapters to bridge directly. AG-UI's transport layer (SSE/WebSocket) matches our existing WebSocket transport.
+
+#### A2UI (Agent-to-User Interface Protocol)
+Google's declarative UI protocol (v0.8 preview). Agent sends JSON describing UI components, client renders them natively. Security-first: no executable code, only trusted component catalog. Framework-agnostic.
+
+**Our alignment**: This maps directly to our "adapter override renderer" concept. An adapter could send A2UI-style component specs for custom UI (e.g., Devin's planning view), and our shell renders them using its React component catalog. A2UI's catalog model = our UI component library.
+
+#### MCP (Model Context Protocol)
+Already in our plan for tool provision. Relevant here because container/cloud agents often expose MCP servers inside their environments (OpenHands, Codex).
+
+**Our alignment**: When an adapter manages a sandbox that runs MCP servers internally, our shell's "MCP Servers" nav section should show those remote MCP servers alongside local ones.
+
+---
+
+### 8.6 — Prioritization for Adapter Support
+
+Based on ecosystem maturity, user demand, and adapter complexity:
+
+| Priority | Execution Model | First Adapters | Rationale |
+|----------|----------------|----------------|-----------|
+| **P0** (have it) | Local CLI | Claude Code CLI | Working today |
+| **P1** (next) | Local SDK | Claude Agent SDK V2, OpenAI Agents SDK | Richest event streams, lowest adapter complexity |
+| **P2** (soon) | Container | OpenHands, E2B | Growing demand for sandbox safety, good APIs |
+| **P3** (planned) | Cloud VM | Codex Cloud, Jules, Cursor BG Agents | Async model requires new UI patterns (plan approval, notifications) |
+| **P4** (future) | Orchestration | LangGraph, CrewAI | Complex topology visualization, niche demand |
+
+---
+
+### 8.7 — Key Findings Summary
+
+1. **The adapter base contract holds.** `startSession()` + `onEvent()` works for all 5 models. Extension interfaces add capabilities without breaking the base.
+
+2. **Execution model is a manifest property, not a capability flag.** Whether an agent runs locally vs. in a cloud VM changes the entire interaction pattern. This deserves its own manifest field, not just a boolean.
+
+3. **Plan-then-execute is the dominant cloud pattern.** Jules, Codex, Cursor BG agents, and Amazon Q all propose plans before executing. Our UI needs a first-class plan approval flow.
+
+4. **PRs are the primary output of cloud agents, not event streams.** Cloud agents produce pull requests. Our shell needs PR integration as a core surface, not an afterthought.
+
+5. **Fork/snapshot is the killer feature for sandboxes.** Daytona's 27ms fork and LangGraph's checkpoint time-travel enable entirely new workflows (speculative execution, A/B testing of approaches). Worth designing for even if we don't build it immediately.
+
+6. **AG-UI is the emerging interop standard.** Our event system should stay compatible. If we ever want adapters written by third parties, AG-UI compatibility reduces their integration burden.
+
+---
+
 ## Next Steps (Immediate)
 
 1. **Week 1:** Run Experiments A and B in parallel. Validate the two hardest unknowns: FS→UI pipeline and SDK→Event pipeline.
