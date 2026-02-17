@@ -13,11 +13,47 @@ export const commandParameterSchema = z.object({
   default: z.unknown().optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Invocation mode — aligns with ACP's AvailableCommand.input pattern.
+//
+// ACP models this as: input field absent → one-off, input field present →
+// requires user text. We make this explicit with a discriminated union so the
+// UI knows how to render each command (button vs input-field).
+// ---------------------------------------------------------------------------
+
+export const immediateInvocationSchema = z.object({
+  /** Fire-and-forget. One click/tap to execute. No user input required. */
+  kind: z.literal('immediate'),
+});
+
+export const promptInvocationSchema = z.object({
+  /** Requires free-form text input before execution. */
+  kind: z.literal('prompt'),
+  /** Placeholder hint shown in the input field (maps to ACP UnstructuredCommandInput.hint). */
+  hint: z.string(),
+});
+
+export const formInvocationSchema = z.object({
+  /** Requires structured parameter input (rendered as a mini-form). */
+  kind: z.literal('form'),
+  /** Which parameters from the command's `parameters` array are shown in the form. Omit to show all required params. */
+  fields: z.array(z.string()).optional(),
+});
+
+export const invocationModeSchema = z.discriminatedUnion('kind', [
+  immediateInvocationSchema,
+  promptInvocationSchema,
+  formInvocationSchema,
+]);
+
 export const commandContractSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   parameters: z.array(commandParameterSchema).default([]),
+  /** How this command is invoked. Determines UI rendering (button vs input field vs form).
+   *  Defaults to 'immediate' when absent — the command is a one-off action. */
+  invocation: invocationModeSchema.optional(),
   keybinding: z.string().optional(),
   source: z.enum(['built_in', 'user_defined', 'plugin', 'autodiscovered']),
   adapterId: z.string(),
@@ -48,6 +84,7 @@ export const specializedCommandContractSchema = z.discriminatedUnion('specializa
 // ---------------------------------------------------------------------------
 
 export type CommandParameter = z.infer<typeof commandParameterSchema>;
+export type InvocationMode = z.infer<typeof invocationModeSchema>;
 export type CommandContract = z.infer<typeof commandContractSchema>;
 export type ClaudeCommandContract = z.infer<typeof claudeCommandContractSchema>;
 export type GenericCommandContract = z.infer<typeof genericCommandContractSchema>;

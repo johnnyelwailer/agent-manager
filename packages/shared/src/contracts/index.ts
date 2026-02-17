@@ -1,6 +1,10 @@
 // Command contracts
 export {
   commandParameterSchema,
+  immediateInvocationSchema,
+  promptInvocationSchema,
+  formInvocationSchema,
+  invocationModeSchema,
   commandContractSchema,
   claudeCommandContractSchema,
   genericCommandContractSchema,
@@ -8,6 +12,7 @@ export {
 } from './command.js';
 export type {
   CommandParameter,
+  InvocationMode,
   CommandContract,
   ClaudeCommandContract,
   GenericCommandContract,

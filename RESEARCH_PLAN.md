@@ -1914,6 +1914,94 @@ interface AdapterManifest {
 
 **Relevance level:** VERY HIGH. This is the closest existing standard to what we're building. We should build on it, not beside it.
 
+### 10.3a — ACP Integration Quality Tiers
+
+**Not all ACP integrations are created equal.** ACP support falls into distinct quality tiers based on how the agent implements the protocol:
+
+#### Tier 1: Native ACP (Built-In)
+
+The agent implements ACP directly in its codebase. No external adapter needed.
+
+| Agent | Notes |
+|-------|-------|
+| **OpenCode** | Clean native implementation. ACP sessions map directly to internal sessions. All features work, though some slash commands (`/undo`, `/redo`) are unsupported. Works identically to terminal mode. |
+| **GitHub Copilot CLI** | Public preview. `copilot --acp` starts an ACP server (stdio or TCP). Full session/prompt/streaming support. Known issue: YOLO mode (`--yolo`) doesn't suppress permission prompts over ACP. |
+| **Goose** | Native ACP. Open-source, first integration alongside Gemini CLI when ACP launched. |
+| **Gemini CLI** | The original reference implementation. ACP was born from Zed + Google's collaboration to integrate Gemini CLI. |
+| **Kiro CLI** | Native `kiro acp` command. |
+
+#### Tier 2: External Adapter (SDK Wrapper)
+
+An adapter process wraps the agent's SDK and translates to ACP. Extra moving part, but still first-party supported.
+
+| Agent | Adapter | Caveats |
+|-------|---------|---------|
+| **Claude Code** | `@zed-industries/claude-code-acp` (Zed, Apache 2.0) | **Uses the Claude Agent SDK, NOT the CLI directly.** See auth caveat below. Not all features supported: Plan mode being added, hooks not supported, some built-in slash commands missing. Subagents work. |
+| **Codex CLI** | `@zed-industries/codex-acp` (Zed) | Community adapter also exists (`codex-acp`). |
+
+#### Tier 3: Community Adapter (Third-Party Wrapper)
+
+Community-built adapters of varying quality and maintenance.
+
+| Agent | Adapter | Notes |
+|-------|---------|-------|
+| **Cursor** | `cursor-agent-acp-npm` | Unofficial bridge. |
+| **Qodo** | `qodo-acp-adapter` | Experimental. |
+| **OpenCode** (alt) | `opencode-acp` (josephschmitt) | Community wrapper; OpenCode now has native ACP so this is redundant. |
+
+#### The Claude Code ACP Authentication Caveat
+
+**This is a real-world example of why integration tier matters.**
+
+Zed's `claude-code-acp` adapter wraps the **Claude Agent SDK** (formerly Claude Code SDK). There's a critical distinction:
+
+- **The Claude Agent SDK officially requires an API key** (`ANTHROPIC_API_KEY`). It is designed for programmatic use.
+- **The Claude Code CLI** supports both API keys AND Claude Pro/Max subscription auth (via browser login).
+- These are **two different tools with different auth models** — the SDK is API-only, the CLI is either.
+
+This caused real user pain:
+1. Users expected ACP to use their existing Claude subscription (browser login)
+2. Instead, ACP was consuming their API key directly, even when they'd logged in via `/login`
+3. Issue tracked at [zed-industries/claude-code-acp#29](https://github.com/zed-industries/claude-code-acp/issues/29)
+4. **Fixed in v0.202.7** — the adapter now stops providing the API key from Zed settings and removes `ANTHROPIC_API_KEY` from the environment, so `/login` auth is properly respected
+5. But the UX is still rough — subscription users must open a thread, run `/login`, authenticate via browser, then use Claude. Not welcoming.
+
+**Lesson for our project:** When we implement ACP as our transport layer, we must be aware that:
+- SDK-based adapters (Tier 2) may have different auth constraints than native agents (Tier 1)
+- Our shell should surface auth configuration clearly per-adapter, not assume one auth model fits all
+- The `AdapterManifest` should declare supported auth methods so the UI can guide users appropriately
+
+#### ACP Slash Commands & Input Requirements
+
+ACP's `AvailableCommand` type already addresses the "does this command need input?" question:
+
+```typescript
+// From @agentclientprotocol/sdk — the actual ACP schema types
+type AvailableCommand = {
+  name: string;                       // e.g. "create_plan", "compact"
+  description: string;                // Human-readable description
+  input?: AvailableCommandInput;      // OPTIONAL — if present, command needs input
+};
+
+type AvailableCommandInput = UnstructuredCommandInput;
+
+type UnstructuredCommandInput = {
+  hint: string;   // Placeholder text, e.g. "What should I plan?"
+};
+
+// Session update that advertises available commands
+type AvailableCommandsUpdate = {
+  availableCommands: Array<AvailableCommand>;
+};
+```
+
+**Key design decision:** If `input` is present, the command requires user input before invocation. If `input` is absent, it's a one-off action (fire-and-forget). The `hint` field provides placeholder text for the input field (e.g. "What should I plan?" for `/plan`, "Search query" for `/search`).
+
+**How our shell should handle this:**
+- Commands without `input` → render as a single-click button/chip. One tap = execute.
+- Commands with `input` → render as a chip that expands to show an input field with the `hint` as placeholder. User types, then submits.
+- VS Code does something similar: some commands are immediate (Toggle Word Wrap), some open an input box (Go to Line).
+
 ### 10.3b — IBM ACP (Agent Communication Protocol) — IBM/BeeAI
 
 **Note:** Different protocol, same acronym. IBM's ACP is for agent-to-agent messaging, not editor-to-agent communication.

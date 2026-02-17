@@ -274,6 +274,47 @@ When no session is selected, the main panel shows adapter-provided actions:
 
 These actions are grouped by adapter. When multiple adapters are active, each adapter's actions appear under its own header. The primary adapter's actions appear first/prominently.
 
+#### Command Invocation Modes
+
+Not every command is a fire-and-forget button press. The `invocation` field on `CommandContract` (aligned with ACP's `AvailableCommand.input`) determines how each command is rendered and triggered:
+
+| Mode | When | UI Rendering | Example |
+|------|------|-------------|---------|
+| **`immediate`** (or absent) | No user input needed | Single-click chip/button | `/compact`, `/clear`, `/stop` |
+| **`prompt`** | Requires free-form text | Chip → inline input field with `hint` placeholder | `/plan` → "What should I plan?", `/search` → "Search query" |
+| **`form`** | Requires structured parameters | Chip → mini-form with named fields | `/deploy` → [env: staging/prod] [branch: ___] |
+
+This prevents the "waste tokens" problem where invoking a prompt-requiring command with no input causes the agent to hallucinate or request clarification on its first turn. The shell can enforce: don't submit a `prompt` command with empty input.
+
+#### Context-Aware Action Suggestions (v2)
+
+**Beyond static command lists:** Instead of showing all available commands equally, the shell can use a lightweight model to suggest contextually relevant actions based on the current conversation state.
+
+**How it works:**
+1. Agent adapters advertise their available commands via ACP's `AvailableCommandsUpdate` (or our equivalent)
+2. The shell maintains conversation context: recent messages, active session state, visible files, git status
+3. A small/fast LLM (Haiku-class) reads the context and the available command list, then returns a ranked subset with pre-filled prompt suggestions
+
+**Example flow:**
+```
+Context: User just reviewed a PR and the agent showed 3 failing tests.
+
+Available commands: /plan, /commit, /test, /review-pr, /compact, /help, ...
+
+LLM suggestion:
+  1. /test  → "Re-run the 3 failing tests after the fix"  [immediate]
+  2. /plan  → "Fix the test failures in auth.test.ts"       [pre-filled prompt]
+  3. /commit → "Commit the PR review changes"               [pre-filled prompt]
+```
+
+**Design constraints:**
+- The LLM call must be **non-blocking** — the static command list always renders immediately, suggestions overlay/reorder asynchronously
+- **Caching** — same context fingerprint → skip the LLM call
+- **Cost-conscious** — Haiku-class model, aggressive prompt compression, only trigger on meaningful context changes (not every keystroke)
+- **Fallback** — if the LLM call fails or times out, the UI shows the default alphabetical/grouped command list
+
+**This is a v2 feature.** For v1, the shell renders commands statically using the `invocation` metadata. Context-aware suggestions are an enhancement once the command system is stable.
+
 ## Agent UI Component System
 
 The core of the framework is a library of UI components that map 1:1 to common agent concepts. Each component has a **contract** (abstract interface) and one or more **implementations** (concrete UI).
