@@ -1241,3 +1241,39 @@ Enable web-based remote access and wrap in Tauri for native desktop.
 | **Brief** | Session start/dispatch | `prototype/src/variants/startup-brief/` |
 
 The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app extracts the Ops/Kanban/Brief designs into `apps/web/` with proper architecture.
+
+## Open Questions
+
+### Architecture & Protocol
+
+1. **ACP client implementation timing.** We chose Option 2 (ACP + our extensions) as the strategy. When do we prototype our ACP client? Do we build it as a generic adapter that wraps any ACP agent, or replace our adapter interface entirely with ACP types? The risk: building too much custom adapter code now that we later throw away once ACP is the transport.
+
+2. **ACP ↔ CommandContract bridging.** Our `invocation` field (immediate/prompt/form) is a richer superset of ACP's `AvailableCommand.input?`. When we receive `AvailableCommandsUpdate` from an ACP agent, how do we map? Proposal: `input` absent → `immediate`, `input` present → `prompt` with `hint`. But ACP has no equivalent to our `form` kind — is that only for our own adapters?
+
+3. **ACP Registry vs. our adapter registry.** The ACP Registry (live in Zed + JetBrains) solves agent discovery. Should we consume it directly? Or maintain our own registry that can pull from ACP Registry as one source among others (for non-ACP agents like GSD, MetaMorph)?
+
+4. **AG-UI ↔ ACP event mapping.** We plan to use AG-UI as our internal event wire format. ACP has its own streaming events. If we're an ACP client, we receive ACP events — do we normalize ACP → AG-UI → UI? Or does ACP replace AG-UI as our wire format? This is a two-protocol-or-one decision.
+
+### Authentication & Billing
+
+5. **Claude auth path: CLI vs SDK.** Our adapter uses CLI wrapping (`claude --output-format stream-json`), which supports subscription auth natively. The ACP adapter uses the SDK. If we're also an ACP client, we'd receive Claude's events via ACP (SDK path). Do we maintain both? Do we prefer one? The CLI path is better for subscription users; the ACP/SDK path is better for ecosystem compatibility.
+
+6. **OAuth for personal use.** The Claude Agent SDK technically supports OAuth via `CLAUDE_CODE_OAUTH_TOKEN` for individual use, but Anthropic officially says SDK = API key only. If a user sets up OAuth personally, it works. Do we document this as a supported path? Or acknowledge it as "works but unsupported"? Risk: Anthropic could break it at any time.
+
+7. **Auth method declaration in AdapterManifest.** We noted the manifest should declare supported auth methods. What's the schema? Proposal: `authMethods: ('api_key' | 'oauth' | 'browser_login' | 'token' | 'none')[]` on the manifest, plus per-method configuration hints.
+
+### UI & UX
+
+8. **Context-aware suggestions model & billing.** The v2 LLM-powered action suggestion system needs its own model call. Which model? Whose API key? Is it the same key as the agent's? Or a separate "shell intelligence" key? If the user only has a Claude subscription (no API key), can we still offer suggestions?
+
+9. **Feature parity communication.** Tier 2 ACP adapters (SDK wrappers like claude-code-acp) don't support all features — no hooks, missing slash commands, partial Plan mode. How do we communicate this in the UI? Grayed-out nav sections? A "capabilities" badge? A "some features unavailable via ACP" warning?
+
+10. **Command palette vs. landing view actions.** Commands appear in two places: the command palette (Cmd+K) and the landing view action grid. Are they the same data source? The palette shows all commands; the landing view shows curated/suggested ones. How do we handle the overlap without confusing users?
+
+### Ecosystem
+
+11. **Non-ACP agents.** Some agents we want to support (GSD, MetaMorph, custom CLI tools) don't speak ACP. Our adapter interface handles these. But if ACP becomes our primary transport, these become second-class citizens. How do we ensure parity? Proposal: our adapter interface IS the abstraction, with an ACP adapter being one implementation. Non-ACP agents use native adapters with the same interface.
+
+12. **ACP version compatibility.** ACP is evolving (v0.14.x currently). How do we handle breaking changes? Do we pin to a specific ACP version? Support multiple versions? The TypeScript SDK publishes frequently.
+
+13. **Multi-agent with mixed ACP/non-ACP.** If Claude runs via ACP and GSD runs via our native adapter, can they coexist in the same session? The shell groups by adapter, so this should work — but do we need to reconcile different event formats at the event bus level?

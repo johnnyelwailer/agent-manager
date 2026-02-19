@@ -1953,23 +1953,40 @@ Community-built adapters of varying quality and maintenance.
 
 **This is a real-world example of why integration tier matters.**
 
-Zed's `claude-code-acp` adapter wraps the **Claude Agent SDK** (formerly Claude Code SDK). There's a critical distinction:
+Zed's `claude-code-acp` adapter wraps the **Claude Agent SDK** (formerly Claude Code SDK). The auth situation is nuanced:
 
-- **The Claude Agent SDK officially requires an API key** (`ANTHROPIC_API_KEY`). It is designed for programmatic use.
-- **The Claude Code CLI** supports both API keys AND Claude Pro/Max subscription auth (via browser login).
-- These are **two different tools with different auth models** — the SDK is API-only, the CLI is either.
+**Three auth layers, three different rules:**
 
-This caused real user pain:
-1. Users expected ACP to use their existing Claude subscription (browser login)
-2. Instead, ACP was consuming their API key directly, even when they'd logged in via `/login`
-3. Issue tracked at [zed-industries/claude-code-acp#29](https://github.com/zed-industries/claude-code-acp/issues/29)
-4. **Fixed in v0.202.7** — the adapter now stops providing the API key from Zed settings and removes `ANTHROPIC_API_KEY` from the environment, so `/login` auth is properly respected
-5. But the UX is still rough — subscription users must open a thread, run `/login`, authenticate via browser, then use Claude. Not welcoming.
+| Layer | Auth Methods | Subscription OK? |
+|-------|-------------|-------------------|
+| **Claude Code CLI** (`claude` binary) | API key OR OAuth (browser login to Pro/Max) | Yes — `claude login` works |
+| **Claude Agent SDK** (programmatic) | API key officially. OAuth token *technically works* for individual use via `CLAUDE_CODE_OAUTH_TOKEN` | Officially: API key only. Practically: OAuth works for personal use |
+| **Third-party products** using SDK | API key only. Anthropic ToS prohibits offering claude.ai login/subscription in third-party products | No — explicitly prohibited |
 
-**Lesson for our project:** When we implement ACP as our transport layer, we must be aware that:
-- SDK-based adapters (Tier 2) may have different auth constraints than native agents (Tier 1)
-- Our shell should surface auth configuration clearly per-adapter, not assume one auth model fits all
-- The `AdapterManifest` should declare supported auth methods so the UI can guide users appropriately
+**The nuance you raised is correct:** For *individual/personal use*, the Claude Agent SDK can use OAuth tokens obtained via `claude setup-token`. The `CLAUDE_CODE_OAUTH_TOKEN` env var is respected by the underlying Claude Code binary that the SDK wraps. A [community demo](https://github.com/weidwonder/claude_agent_sdk_oauth_demo) confirms this works for both TS and Python SDKs.
+
+**But Anthropic's official position is restrictive:**
+- Issue [anthropics/claude-code#6536](https://github.com/anthropics/claude-code/issues/6536) — "Can the SDK use CLAUDE_CODE_OAUTH_TOKEN?" → **Closed as NOT PLANNED**. Official answer: SDK is designed for API keys only, different billing model.
+- Issue [anthropics/claude-agent-sdk-python#559](https://github.com/anthropics/claude-agent-sdk-python/issues/559) — "SDK should support Max plan billing" → still open, significant community demand.
+- In January 2026, Anthropic [restricted OAuth tokens](https://jpcaparas.medium.com/claude-code-cripples-third-party-coding-agents-from-using-oauth-6548e9b49df3) to work only within Claude Code itself, blocking external API use. Third-party harnesses using subscriptions are explicitly prohibited by ToS.
+
+**What this means in practice:**
+- **Individual users** building personal tools: OAuth *works* via `CLAUDE_CODE_OAUTH_TOKEN` but is unsupported/could break at any time.
+- **Product builders** (us, if we distribute): Must use API keys. Cannot offer "log in with your Claude subscription" as a feature.
+- **The Zed ACP fix** (v0.202.7): Works because Zed removed `ANTHROPIC_API_KEY` from env, letting the underlying Claude Code binary fall back to its own auth (which includes OAuth). This is Zed being clever, not Anthropic endorsing it.
+
+**Historical pain:**
+1. Users expected ACP to use their existing Claude subscription
+2. Instead, ACP consumed their API key directly, even after `/login`
+3. Tracked at [zed-industries/claude-code-acp#29](https://github.com/zed-industries/claude-code-acp/issues/29)
+4. Fixed in v0.202.7 — adapter removes `ANTHROPIC_API_KEY` from environment
+5. UX is still rough — subscription users must open a thread, run `/login`, authenticate, then use Claude
+
+**Lesson for our project:**
+- **Our shell wraps the CLI, not the SDK** — so subscription auth works natively via `claude login`. This is a deliberate advantage over SDK-based approaches.
+- When acting as an ACP client for *other* agents' ACP adapters (Tier 2), we inherit whatever auth constraints the adapter imposes. We can't fix that.
+- The `AdapterManifest` should declare supported auth methods so the UI can guide users appropriately per-adapter.
+- If Anthropic eventually opens SDK OAuth for third-party use, we can add SDK-based adapters. Until then, CLI wrapping is the safer path for subscription users.
 
 #### ACP Slash Commands & Input Requirements
 
