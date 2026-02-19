@@ -1025,12 +1025,8 @@ agent-manager/
 │   │   ├── src/
 │   │   │   ├── main.tsx
 │   │   │   ├── routes/         # TanStack Router file-based routes
-│   │   │   │   ├── __root.tsx
-│   │   │   │   ├── index.tsx   # → redirect to /manager
-│   │   │   │   ├── manager.tsx # Agent Manager (three-column inbox)
-│   │   │   │   ├── ops.tsx     # Ops (sidebar + conversation + review)
-│   │   │   │   ├── kanban.tsx  # Kanban board (overview/triage)
-│   │   │   │   └── settings.tsx
+│   │   │   │   ├── __root.tsx  # App shell: sidebar tree + content pane
+│   │   │   │   └── index.tsx   # Single route — sidebar tree drives content
 │   │   │   ├── components/
 │   │   │   │   ├── layout/     # Responsive shell (sidebar, nav, panels)
 │   │   │   │   ├── ui/         # shadcn primitives (re-exported from packages/ui)
@@ -1152,15 +1148,15 @@ Stand up the real React app with routing, components, and live data. Responsive 
 | Task | Description |
 |------|-------------|
 | Init `apps/web` | Vite 7 + React 19 + TW4 + shadcn/ui |
-| TanStack Router | File-based routes: `/manager`, `/ops`, `/kanban`, `/settings` |
-| Responsive shell | Adaptive layout: multi-panel (desktop) → stacked (tablet) → single + drawer (mobile). Bottom nav on mobile. Header bar with view toggle, `Cmd+K`, settings. Status bar with connection/agents/cost. |
+| App shell | Sidebar tree (left) + content pane (right). No tabs, no header toggle. Tree drives all navigation. |
+| Sidebar tree | Expandable/collapsible sections: Sessions, Board, Adapters, Projects, MCPs, Settings. Capability-driven (sections only appear if adapters support them). Status badges on session nodes. |
+| Content pane renderers | Landing (nothing selected), Session inbox (Sessions header), Session view (specific session: conversation + review panel), Kanban (Board), Adapter/Project/MCP detail views, Settings. |
+| Responsive shell | Desktop: tree + content visible. Tablet: tree collapses to icon rail. Mobile: tree is slide-out drawer, review panel is bottom sheet. |
 | Hono RPC client | Typed API client generated from server routes |
 | WebSocket store | Zustand store for connection + real-time events |
 | Session store | Zustand store for sessions, tasks, workflow state |
 | Adapter store | Zustand store for adapter registry, capabilities, discovered commands/skills/MCPs |
-| **Manager view** | Three-column inbox (Adapters/Projects → Session Inbox → Session Detail). Status badges. Filterable. "Open in Ops" navigation. Inspired by Antigravity Agent Manager. |
-| **Ops view** | Three-panel working view (Session sidebar → Conversation/Stream → Review/Artifacts). Inline approval prompts. Diff viewer with per-chunk staging. Landing state with prompt input + action grid when no session active. Inspired by Codex Desktop. |
-| Kanban view | Port design from prototype, wire to live stores, responsive layout |
+| Navigation store | Zustand store for sidebar tree selection state (which node is active → determines content pane) |
 | Command palette | `Cmd+K` overlay. All commands from `adaptersStore.commands[]`, fuzzy-searchable, grouped by adapter. |
 
 ### Phase 4: Claude Auto-Discovery + End-to-End Flow
@@ -1250,164 +1246,132 @@ Two apps define the interaction patterns we're adopting:
 
 | Pattern | Source | Our Implementation |
 |---------|--------|--------------------|
-| **Dual-mode architecture** | Antigravity | Two primary views: **Agent Manager** (inbox/orchestration) and **Ops** (active session focus). Toggle with `Cmd+E`. Not separate windows — route-based views in one app. |
-| **Inbox metaphor for agent tasks** | Antigravity | The Agent Manager view uses a three-column layout: Adapters/Projects (left) → Session Inbox (middle) → Active Session detail (right). Sessions are the "emails" with status badges. |
-| **Three-panel working view** | Codex | The Ops view: sidebar (session list + nav) + center (conversation/stream) + right (diff review / artifacts). Collapsible panels. |
-| **Thread-per-task** | Codex | Each session is one task, one conversation. Parallel sessions via the inbox. |
-| **Inline diff review** | Codex | Right panel shows git diff with syntax highlighting, per-file/chunk staging, inline comments. Diff scope: unstaged / staged / all branch / last turn. |
+| **Sidebar tree as sole navigation** | VS Code explorer | No tabs, no header toggle. One persistent sidebar tree controls everything. Clicking a node changes the content pane. Tree sections expand/collapse. |
+| **Inbox metaphor for sessions** | Antigravity | Sessions section in the sidebar tree. Each session is a node with status badge. Clicking opens it in the content pane. |
+| **Three-panel working view** | Codex | When a session is selected: content pane splits into conversation + review panel. The sidebar tree stays. |
+| **Thread-per-task** | Codex | Each session is one task, one conversation. Parallel sessions listed in tree. |
+| **Inline diff review** | Codex | Review panel shows git diff with syntax highlighting, per-file/chunk staging, inline comments. Diff scope: unstaged / staged / all branch / last turn. |
 | **Command surfaces (3 layers)** | Codex | `Cmd+K` palette (all commands, fuzzy search) + `/` slash commands in composer + landing view action grid (featured + heuristic ranked). |
-| **Artifacts panel** | Antigravity | Plans, diffs, research docs, verification results — surfaced as reviewable objects, not buried in chat. Toggle with a button in session header. |
-| **Status badges** | Antigravity | Every session in the inbox shows: Idle / Running / Blocked / Completed. Color-coded. Scannable at a glance. |
+| **Artifacts panel** | Antigravity | Plans, diffs, research docs, verification results — surfaced as reviewable objects in the review panel. Not buried in chat. |
+| **Status badges** | Antigravity | Every session node in the tree shows: Idle / Running / Blocked / Completed. Color-coded. Scannable at a glance. |
 | **Development mode presets** | Antigravity | Adapter-level autonomy settings: Autonomous (agent decides everything) / Assisted (agent pauses at checkpoints) / Supervised (approve every action). Maps to our approval flow. |
 | **Approval flow** | Codex | When an agent needs confirmation: inline buttons (Approve / Approve for session / Reject). Rendered as `ChatElementContract` type `confirm`. |
 | **Custom action buttons** | Codex | Adapter-provided `featured` commands render as action buttons in the session header. Quick access to frequent actions without palette. |
 | **Pop-out sessions** | Codex | Any session can be popped out to a separate browser window (or Tauri window in desktop mode). Always-on-top option. Good for monitoring while using another editor. |
 | **Inline comments on agent output** | Antigravity | Select text in a plan or diff → leave a comment → agent incorporates feedback. More precise than chat-based correction. |
 | **Per-session model selection** | Antigravity | When creating a session, pick the model (if the adapter supports multiple). Different sessions can use different models simultaneously. |
-| **Automations / Triage inbox** | Codex | Future: scheduled tasks that run agents on triggers. Results land in a triage sub-inbox for review. |
+| **Automations / Triage inbox** | Codex | Future: scheduled tasks that run agents on triggers. Results land in a triage sub-section in the tree for review. |
 
 ### What We Don't Adopt
 
 | Pattern | Source | Why Not |
 |---------|--------|---------|
-| Separate windows for editor/manager | Antigravity | We're not an IDE. Single app, route-based views. `Cmd+E` switches routes, not windows. |
+| Separate windows for editor/manager | Antigravity | We're not an IDE. Single app, sidebar tree drives navigation. |
+| Tabbed/header view switching | Codex | No tabs. All navigation via sidebar tree. Content pane adapts to selection. |
 | VS Code fork / integrated editor | Antigravity | We're editor-agnostic. The user's editor is external. We show diffs and artifacts, not a full editor. |
 | Browser sub-agent with video recordings | Antigravity | Scope creep. Future consideration, not Phase 2-5. |
 | Personality modes (Pragmatic/Friendly) | Codex | The agent's personality is the agent's business. Our shell doesn't impose personality on agents. |
 | Cloud execution target | Codex | We're local-first. Cloud agents connect via adapters, but we don't provision cloud sandboxes. |
 
-### View Architecture
+### Layout Architecture
+
+**No tabs. No header view toggle. The sidebar tree is the sole navigation mechanism.** The app is always: sidebar tree (left) + content pane (right). What's in the content pane depends entirely on what's selected in the tree.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  App Shell (always visible)                                      │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  Header Bar                                                  │ │
-│  │  [Logo] [View Toggle: Manager | Ops | Kanban] ... [Cmd+K] [⚙]│ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  Route Content (fills remaining space)                       │ │
-│  │                                                               │ │
-│  │  /manager  → Agent Manager (three-column inbox)              │ │
-│  │  /ops      → Ops View (sidebar + conversation + review)      │ │
-│  │  /kanban   → Kanban Board (overview/triage)                  │ │
-│  │  /settings → Settings                                        │ │
-│  │                                                               │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  Status Bar (connection, active agents count, cost)          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────┬─────────────────────────────────────────────────┐
+│  Sidebar Tree     │  Content Pane                                   │
+│                    │  (adapts to tree selection)                     │
+│  ┌──────────────┐ │                                                 │
+│  │ [+] [Cmd+K]  │ │  Landing / Session / Kanban / Settings / ...   │
+│  ├──────────────┤ │                                                 │
+│  │ ▸ Sessions   │ │                                                 │
+│  │   ● auth-fix │ │                                                 │
+│  │   ○ tests    │ │                                                 │
+│  │   ◉ review   │ │                                                 │
+│  │   ✓ refactor │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Board      │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Adapters   │ │                                                 │
+│  │   Claude CLI │ │                                                 │
+│  │   Claude ACP │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Projects   │ │                                                 │
+│  │   agent-mgr  │ │                                                 │
+│  │   website    │ │                                                 │
+│  │              │ │                                                 │
+│  │ ─────────    │ │                                                 │
+│  │ ⚙ Settings   │ │                                                 │
+│  └──────────────┘ │                                                 │
+│  ┌──────────────┐ │                                                 │
+│  │ Status Bar   │ │                                                 │
+│  └──────────────┘ │                                                 │
+└──────────────────┴─────────────────────────────────────────────────┘
 ```
 
-#### Agent Manager View (`/manager`)
+#### Sidebar Tree Structure
 
-The orchestration hub. Inspired by Antigravity's three-column layout and Codex's thread management.
-
-```
-┌──────────────┬──────────────────────┬──────────────────────────────┐
-│  Adapters &  │  Session Inbox       │  Active Session Detail        │
-│  Projects    │                      │                                │
-│              │  ┌────────────────┐  │  Session: "Fix auth bug"       │
-│  ▸ Claude    │  │ ● Fix auth bug │  │  Adapter: Claude CLI           │
-│    CLI       │  │   Running 2m   │  │  Status: ● Running             │
-│              │  ├────────────────┤  │  Model: Opus 4.6               │
-│  ▸ Claude    │  │ ○ Add tests    │  │  Cost: $0.42                   │
-│    ACP       │  │   Idle         │  │                                │
-│              │  ├────────────────┤  │  ┌─ Artifacts ──────────────┐  │
-│  ▸ GSD       │  │ ◉ Review PR    │  │  │  Plan (3 steps)         │  │
-│              │  │   Blocked      │  │  │  Diff (+42 / -12)       │  │
-│  ─────────   │  ├────────────────┤  │  │  Verification: ✓ pass   │  │
-│  Projects    │  │ ✓ Refactor DB  │  │  └──────────────────────────┘  │
-│  ▸ agent-mgr │  │   Completed    │  │                                │
-│  ▸ website   │  └────────────────┘  │  [Open in Ops] [Pop Out]       │
-│              │                      │  [Archive] [Resume]            │
-│              │  [+ New Session]     │                                │
-└──────────────┴──────────────────────┴──────────────────────────────┘
-```
-
-- **Left column:** Registered adapters (expandable, show capabilities) and project workspaces. Clicking an adapter filters the inbox. Clicking a project scopes sessions to that project.
-- **Middle column:** Session inbox. Each row: status badge (color dot), title, time/status, adapter icon. Sorted by activity (running first, then blocked, then recent). Filterable by status, adapter, project.
-- **Right column:** Selected session detail. Shows metadata (adapter, model, cost, duration), artifacts list, and quick actions. "Open in Ops" navigates to the full working view. "Pop Out" opens in a new window.
-
-Status badges:
-- `●` Green = Running
-- `◉` Yellow = Blocked (waiting for input/approval)
-- `○` Gray = Idle
-- `✓` Blue = Completed
-
-#### Ops View (`/ops`)
-
-The active working view. Inspired by Codex's three-panel layout.
+The sidebar tree has a fixed set of top-level sections. Each section expands to show its children. Clicking any leaf node changes the content pane.
 
 ```
-┌────────────┬────────────────────────────────┬──────────────────────┐
-│  Session    │  Conversation / Stream         │  Review Panel        │
-│  List       │                                │                      │
-│             │  ┌──────────────────────────┐  │  ┌ Diff ──────────┐ │
-│  ● auth-fix │  │ Agent: Analyzing the auth │  │  │ src/auth.ts    │ │
-│  ○ tests    │  │ module...                 │  │  │  +import {...} │ │
-│  ◉ review   │  │                           │  │  │  -old code     │ │
-│  ✓ refactor │  │ [Tool Call] Read file     │  │  │  +new code     │ │
-│             │  │ src/auth.ts               │  │  │                │ │
-│             │  │                           │  │  │ [Stage] [Revert│ │
-│             │  │ [Approval Request]        │  │  └────────────────┘ │
-│             │  │ Run `npm test`?           │  │                      │
-│             │  │ [Approve] [Approve All]   │  │  ┌ Artifacts ────┐  │
-│             │  │ [Reject]                  │  │  │ Plan (2/5)     │  │
-│             │  │                           │  │  │ Research doc   │  │
-│             │  └──────────────────────────┘  │  └────────────────┘  │
-│             │                                │                      │
-│             │  ┌──────────────────────────┐  │  Scope: [Unstaged ▾] │
-│  [+ New]    │  │ > prompt input...        │  │  [Stage All] [Revert]│
-│             │  └──────────────────────────┘  │                      │
-└────────────┴────────────────────────────────┴──────────────────────┘
+[+] New Session     [Cmd+K]
+──────────────────────────────
+▾ Sessions                          ← always expanded by default
+  ● Fix auth bug          2m  $0.42 ← status dot + title + time + cost
+  ◉ Review PR #42        12m  $1.80 ← yellow = blocked (needs input)
+  ○ Add test coverage      —  $0.00 ← gray = idle
+  ✓ Refactor DB          38m  $3.20 ← blue = completed
+  ✓ Update deps           5m  $0.60
+  ··· Show archived (12)            ← collapsed by default
+
+▾ Board                             ← kanban view
+  (no children — clicking "Board" opens kanban in content pane)
+
+▸ Adapters                          ← collapsed by default
+  Claude CLI        ✓ connected
+  Claude ACP        ✓ connected
+  GSD               ○ not configured
+
+▸ Projects                          ← collapsed by default
+  agent-manager     3 sessions
+  website           1 session
+
+▸ MCPs                              ← only if adapters have MCPs
+  filesystem        ✓ running
+  github            ✓ running
+
+──────────────────────────────
+⚙ Settings
 ```
 
-- **Left sidebar:** Session list (same as inbox but compact). Click to switch active session. Status badges. Collapsible.
-- **Center panel:** The active conversation. Chat messages + tool calls + approval prompts + inline interactive elements (`ChatElementContract`). Composer at bottom with `/` slash commands, image drop, voice input. Streamed in real-time via AG-UI events.
-- **Right panel:** Review + artifacts. Top section: diff viewer (syntax highlighted, per-file staging, inline comments). Bottom section: artifacts list (plans, research docs, verification results). Scope selector for diff (unstaged / staged / all branch / last turn). Collapsible.
+**Tree sections are capability-driven.** If no adapter declares MCP support, the "MCPs" section doesn't appear. If no adapter declares hooks, no "Hooks" section. The tree reflects what's actually available (per Q9 resolution).
 
-Panels are **resizable** (drag dividers) and **collapsible** (double-click divider or keyboard shortcut). On narrow screens, collapses to center-only with drawers for sidebar and review panel.
+**Tree node types and what they render in the content pane:**
 
-#### Kanban View (`/kanban`)
+| Tree Node | Content Pane |
+|-----------|-------------|
+| Nothing selected (app start) | **Landing view** — prompt input, action grid, recent sessions |
+| `Sessions` header | **Session inbox** — filterable list with detail panel |
+| A specific session | **Session view** — conversation + review panel (split) |
+| `Board` | **Kanban board** — drag-and-drop columns |
+| `Adapters` header | **Adapters overview** — card grid of all adapters with status |
+| A specific adapter | **Adapter detail** — capabilities, auth config, sessions using it |
+| `Projects` header | **Projects overview** — project list with session counts |
+| A specific project | **Project detail** — sessions scoped to that project |
+| `MCPs` header | **MCP browser** — all MCP servers with tools list |
+| A specific MCP | **MCP detail** — tools, status, configuration |
+| `Settings` | **Settings** — categorized settings panels |
 
-Overview and triage. Preserved from prototype exploration.
+#### Sidebar Header
 
-```
-┌──────────────┬──────────────┬──────────────┬──────────────┐
-│   Backlog    │  In Progress │  In Review   │    Done      │
-│              │              │              │              │
-│  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │
-│  │Task    │  │  │Task    │  │  │Task    │  │  │Task    │  │
-│  │Card    │  │  │Card    │  │  │Card    │  │  │Card    │  │
-│  └────────┘  │  └────────┘  │  └────────┘  │  └────────┘  │
-│              │              │              │              │
-└──────────────┴──────────────┴──────────────┴──────────────┘
-```
+The sidebar header has two persistent actions:
 
-Drag-and-drop task cards between columns. Cards show: title, adapter icon, status badge, cost, linked session. Clicking a card opens the session in Ops view.
+- **[+] New Session** — opens the session creation flow in the content pane (adapter picker + prompt input + model selector).
+- **[Cmd+K]** — opens the command palette overlay.
 
-#### Settings View (`/settings`)
+#### Content Pane: Landing View (nothing selected)
 
-Organized by category (following Codex's structure):
-
-| Section | Contents |
-|---------|----------|
-| **General** | Default adapter, default model, working directory, notification preferences |
-| **Adapters** | Registered adapters list. Per-adapter: auth config (from `AuthConfig`), capabilities view, enable/disable. "Add adapter" flow. |
-| **Appearance** | Theme (dark/light/auto), UI font, code font, accent color |
-| **Git** | Branch naming pattern, force push toggle, commit message template, PR description template |
-| **MCP** | Enabled MCP servers, add custom servers, per-server auth |
-| **Autonomy** | Default development mode preset (Autonomous / Assisted / Supervised). Per-adapter overrides. |
-| **Keyboard** | Shortcut customization |
-| **Advanced** | Feature flags, debug mode, data export |
-
-#### Landing View (within Ops, no active session)
-
-When no session is active in Ops view, the center panel shows a landing surface:
+On app start, or when no specific node is selected:
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -1434,61 +1398,170 @@ When no session is active in Ops view, the center panel shows a landing surface:
 └────────────────────────────────────────────────────┘
 ```
 
-- **Prompt input** with adapter selector dropdown (shows only adapters with valid auth).
-- **Suggested actions** grid: `featured` commands + heuristic-ranked recent/frequent commands. Max 6-9 visible. "Show all" opens `Cmd+K` palette.
-- **Recent sessions** list: last 5 sessions with title, time, cost. Click to resume or review.
+- **Prompt input** with adapter selector dropdown.
+- **Suggested actions** grid: `featured` commands + heuristic-ranked.
+- **Recent sessions** list (clickable — selects in sidebar tree).
+
+#### Content Pane: Session View (session selected)
+
+When a session node is clicked in the tree, the content pane splits:
+
+```
+┌────────────────────────────────────┬──────────────────────┐
+│  Conversation / Stream             │  Review Panel        │
+│                                    │                      │
+│  ┌──────────────────────────────┐  │  ┌ Diff ──────────┐ │
+│  │ Agent: Analyzing the auth    │  │  │ src/auth.ts    │ │
+│  │ module...                    │  │  │  +import {...} │ │
+│  │                              │  │  │  -old code     │ │
+│  │ [Tool Call] Read file        │  │  │  +new code     │ │
+│  │ src/auth.ts                  │  │  │                │ │
+│  │                              │  │  │ [Stage] [Revert│ │
+│  │ [Approval Request]           │  │  └────────────────┘ │
+│  │ Run `npm test`?              │  │                      │
+│  │ [Approve] [Approve All]      │  │  ┌ Artifacts ────┐  │
+│  │ [Reject]                     │  │  │ Plan (2/5)     │  │
+│  │                              │  │  │ Research doc   │  │
+│  └──────────────────────────────┘  │  └────────────────┘  │
+│                                    │                      │
+│  ┌──────────────────────────────┐  │  Scope: [Unstaged ▾] │
+│  │ > prompt input...  [/] [📎]  │  │  [Stage All] [Revert]│
+│  └──────────────────────────────┘  │                      │
+└────────────────────────────────────┴──────────────────────┘
+```
+
+- **Left: Conversation.** Chat messages + tool calls + approval prompts + inline interactive elements. Composer at bottom with `/` slash commands. Streamed real-time via AG-UI events.
+- **Right: Review panel.** Diff viewer (syntax highlighted, per-file staging, inline comments) + artifacts list. Scope selector (unstaged / staged / all branch / last turn). **Collapsible** via `Cmd+\`.
+
+The sidebar tree stays visible on the left — so the full layout is: **sidebar tree | conversation | review panel**. The tree provides instant session switching without leaving the current view.
+
+#### Content Pane: Session Inbox (Sessions header selected)
+
+When the "Sessions" section header itself is clicked (not a specific session):
+
+```
+┌────────────────────────────┬──────────────────────────────────┐
+│  Session List (filterable) │  Selected Session Detail          │
+│                            │                                    │
+│  Filter: [All ▾] [🔍]     │  Session: "Fix auth bug"           │
+│                            │  Adapter: Claude CLI               │
+│  ┌──────────────────────┐  │  Status: ● Running                 │
+│  │ ● Fix auth bug  2m   │  │  Model: Opus 4.6                   │
+│  │   Claude CLI  $0.42  │  │  Cost: $0.42                       │
+│  ├──────────────────────┤  │  Duration: 2m                      │
+│  │ ◉ Review PR   12m   │  │                                    │
+│  │   Claude CLI  $1.80  │  │  ┌─ Artifacts ──────────────────┐  │
+│  ├──────────────────────┤  │  │  Plan (3 steps, 2 complete)  │  │
+│  │ ○ Add tests    —    │  │  │  Diff (+42 / -12)            │  │
+│  │   Claude ACP  $0.00  │  │  │  Verification: ✓ pass        │  │
+│  ├──────────────────────┤  │  └──────────────────────────────┘  │
+│  │ ✓ Refactor   38m    │  │                                    │
+│  │   GSD        $3.20   │  │  [Open Session] [Pop Out]         │
+│  └──────────────────────┘  │  [Archive]                         │
+└────────────────────────────┴──────────────────────────────────┘
+```
+
+Two-column inbox: filterable session list (left) + detail (right). "Open Session" selects the session in the tree, switching to the full session view.
+
+#### Content Pane: Kanban Board (Board selected)
+
+```
+┌──────────────┬──────────────┬──────────────┬──────────────┐
+│   Backlog    │  In Progress │  In Review   │    Done      │
+│              │              │              │              │
+│  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │
+│  │Task    │  │  │Task    │  │  │Task    │  │  │Task    │  │
+│  │Card    │  │  │Card    │  │  │Card    │  │  │Card    │  │
+│  └────────┘  │  └────────┘  │  └────────┘  │  └────────┘  │
+│              │              │              │              │
+└──────────────┴──────────────┴──────────────┴──────────────┘
+```
+
+Drag-and-drop task cards. Cards show: title, adapter icon, status badge, cost, linked session. Clicking a card selects the session in the tree.
+
+#### Content Pane: Settings (Settings selected)
+
+Organized by category:
+
+| Section | Contents |
+|---------|----------|
+| **General** | Default adapter, default model, working directory, notification preferences |
+| **Adapters** | Registered adapters list. Per-adapter: auth config (from `AuthConfig`), capabilities view, enable/disable. "Add adapter" flow. |
+| **Appearance** | Theme (dark/light/auto), UI font, code font, accent color |
+| **Git** | Branch naming pattern, force push toggle, commit message template, PR description template |
+| **MCP** | Enabled MCP servers, add custom servers, per-server auth |
+| **Autonomy** | Default development mode preset (Autonomous / Assisted / Supervised). Per-adapter overrides. |
+| **Keyboard** | Shortcut customization |
+| **Advanced** | Feature flags, debug mode, data export |
+
+#### Status Bar
+
+Persistent at the bottom of the sidebar (not full-width):
+- Connection status (WS connected/disconnected)
+- Active agent count (e.g., "2 running")
+- Total session cost
 
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
 | `Cmd+K` | Command palette (all commands, fuzzy search) |
-| `Cmd+E` | Toggle Manager ↔ Ops view |
-| `Cmd+J` | Toggle terminal panel (within Ops session) |
-| `Cmd+,` | Settings |
 | `Cmd+N` | New session |
 | `Cmd+Enter` | Send prompt (configurable) |
 | `Cmd+\` | Toggle review panel |
-| `Cmd+B` | Toggle sidebar |
-| `Cmd+1/2/3` | Switch to Manager/Ops/Kanban |
-| `/` | Slash command (in composer) |
+| `Cmd+B` | Toggle sidebar tree |
+| `Cmd+J` | Toggle terminal panel (within session) |
+| `Cmd+,` | Settings (selects Settings in tree) |
+| `/` | Slash command (in composer, when focused) |
 | `Esc` | Close palette/dialog/panel |
-| `Up/Down` | Navigate sessions list or command palette |
+| `Up/Down` | Navigate tree nodes or command palette |
+| `Enter` | Expand/select tree node |
+| `Left/Right` | Collapse/expand tree section |
 
 ### Responsive Behavior
 
 | Breakpoint | Layout |
 |-----------|--------|
-| **Desktop (≥1280px)** | Full three-panel layout. All columns visible. Resizable dividers. |
-| **Tablet (768-1279px)** | Two panels: sidebar collapses to icon rail, review panel becomes a slide-over drawer. Manager view becomes two-column (inbox + detail). |
-| **Mobile (<768px)** | Single panel with bottom navigation. Views are full-screen. Sidebar, review panel, and inbox are slide-up drawers. Swipe gestures for navigation. |
+| **Desktop (≥1280px)** | Sidebar tree + content pane (which may split into conversation + review). All visible. Resizable dividers. |
+| **Tablet (768-1279px)** | Sidebar collapses to icon rail (section icons only, expands on hover/click). Review panel becomes a slide-over drawer triggered by `Cmd+\`. |
+| **Mobile (<768px)** | Sidebar becomes a slide-out drawer (hamburger icon). Content pane is full-screen. Review panel is a bottom sheet. Navigation via drawer + swipe gestures. |
 
 ### Component Mapping
 
-| UI Component | Contract/Data Source | View(s) |
-|-------------|---------------------|---------|
-| Session card (inbox) | `Session` + `AgentEvent[]` | Manager, Ops sidebar |
-| Conversation thread | `AgentEvent[]` stream | Ops center |
-| Diff viewer | Git diff + `WorktreeContract` | Ops review panel |
-| Artifacts list | `ResearchDocContract[]` + `TaskContract[]` | Ops review panel, Manager detail |
-| Command palette | `CommandContract[]` from `adaptersStore` | Global overlay |
+| UI Component | Contract/Data Source | Content Pane |
+|-------------|---------------------|-------------|
+| Sidebar tree | All stores (sessions, adapters, projects, MCPs) | Always visible (left) |
+| Landing view | `CommandContract[]` (featured) + recent sessions | Nothing selected |
+| Session inbox | `Session[]` filterable list | Sessions header selected |
+| Conversation thread | `AgentEvent[]` stream | Session selected (left split) |
+| Diff viewer | Git diff + `WorktreeContract` | Session selected (review panel) |
+| Artifacts list | `ResearchDocContract[]` + `TaskContract[]` | Session selected (review panel) |
+| Command palette | `CommandContract[]` from `adaptersStore` | Global overlay (`Cmd+K`) |
 | Action grid | `CommandContract[]` where `featured: true` + heuristic ranked | Landing view |
-| Approval prompt | `ChatElementContract` type `confirm` | Ops conversation (inline) |
-| Task card (kanban) | `TaskContract` | Kanban |
-| Adapter config | `AdapterManifest` + `AuthConfig` | Settings |
-| Skill card | `SkillContract` | Settings, command palette |
-| MCP browser | `McpContract` | Settings |
+| Approval prompt | `ChatElementContract` type `confirm` | Session conversation (inline) |
+| Task card (kanban) | `TaskContract` | Board selected |
+| Adapter overview | `AdapterManifest[]` + `AuthConfig[]` | Adapters header selected |
+| Adapter detail | `AdapterManifest` + `AgentCapabilities` | Specific adapter selected |
+| MCP browser | `McpContract[]` | MCPs header selected |
+| Settings panels | Config stores | Settings selected |
 
-### Key UI Views (from prototype exploration)
+### Content Pane Summary
 
-| View | Role | Design Reference |
-|------|------|------------------|
-| **Manager** | Orchestration inbox (new, inspired by Antigravity) | — |
-| **Ops** | Primary working view | `prototype/src/variants/ops/` |
-| **Kanban** | Overview/triage board | `prototype/src/variants/kanban/` |
-| **Brief** → merged into Ops Landing | Session start/dispatch | `prototype/src/variants/startup-brief/` |
+| Tree Selection | Content Pane Renders |
+|---------------|---------------------|
+| Nothing (app start) | Landing: prompt input + action grid + recent sessions |
+| Sessions header | Inbox: filterable list + detail panel |
+| Specific session | Session: conversation (left) + review panel (right, collapsible) |
+| Board | Kanban: drag-and-drop columns |
+| Adapters header | Grid of adapter cards with status |
+| Specific adapter | Adapter config: capabilities, auth, sessions |
+| Projects header | Project list with session counts |
+| Specific project | Sessions scoped to project |
+| MCPs header | MCP browser: servers + tools |
+| Specific MCP | MCP detail: tools, status, config |
+| Settings | Categorized settings panels |
 
-The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app extracts the Ops/Kanban designs into `apps/web/`, adds the new Manager view, and merges Brief into the Ops landing state.
+The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app uses the sidebar-tree + content-pane model. Prototype Ops/Kanban/Brief designs inform the content pane renderers.
 
 ## Open Questions
 
