@@ -1246,17 +1246,25 @@ The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as de
 
 ### Architecture & Protocol
 
-1. **ACP client implementation timing.** We chose Option 2 (ACP + our extensions) as the strategy. When do we prototype our ACP client? Do we build it as a generic adapter that wraps any ACP agent, or replace our adapter interface entirely with ACP types? The risk: building too much custom adapter code now that we later throw away once ACP is the transport.
+1. **ACP client implementation timing.** ~~We chose Option 2 (ACP + our extensions) as the strategy. When do we prototype our ACP client? Do we build it as a generic adapter that wraps any ACP agent, or replace our adapter interface entirely with ACP types? The risk: building too much custom adapter code now that we later throw away once ACP is the transport.~~
 
-2. **ACP ↔ CommandContract bridging.** Our `invocation` field (immediate/prompt/form) is a richer superset of ACP's `AvailableCommand.input?`. When we receive `AvailableCommandsUpdate` from an ACP agent, how do we map? Proposal: `input` absent → `immediate`, `input` present → `prompt` with `hint`. But ACP has no equivalent to our `form` kind — is that only for our own adapters?
+   **RESOLVED:** ACP is an adapter, not a replacement for our adapter interface. See "Protocol Layering Resolution" below.
+
+2. **ACP ↔ CommandContract bridging.** ~~Our `invocation` field (immediate/prompt/form) is a richer superset of ACP's `AvailableCommand.input?`. When we receive `AvailableCommandsUpdate` from an ACP agent, how do we map? Proposal: `input` absent → `immediate`, `input` present → `prompt` with `hint`. But ACP has no equivalent to our `form` kind — is that only for our own adapters?~~
+
+   **RESOLVED:** The ACP adapter normalizes on ingest. See mapping table below.
 
 3. **ACP Registry vs. our adapter registry.** The ACP Registry (live in Zed + JetBrains) solves agent discovery. Should we consume it directly? Or maintain our own registry that can pull from ACP Registry as one source among others (for non-ACP agents like GSD, MetaMorph)?
 
-4. **AG-UI ↔ ACP event mapping.** We plan to use AG-UI as our internal event wire format. ACP has its own streaming events. If we're an ACP client, we receive ACP events — do we normalize ACP → AG-UI → UI? Or does ACP replace AG-UI as our wire format? This is a two-protocol-or-one decision.
+4. **AG-UI ↔ ACP event mapping.** ~~We plan to use AG-UI as our internal event wire format. ACP has its own streaming events. If we're an ACP client, we receive ACP events — do we normalize ACP → AG-UI → UI? Or does ACP replace AG-UI as our wire format? This is a two-protocol-or-one decision.~~
+
+   **RESOLVED:** ACP and AG-UI operate at different layers. They don't compete. See resolution below.
 
 ### Authentication & Billing
 
-5. **Claude auth path: CLI vs SDK.** Our adapter uses CLI wrapping (`claude --output-format stream-json`), which supports subscription auth natively. The ACP adapter uses the SDK. If we're also an ACP client, we'd receive Claude's events via ACP (SDK path). Do we maintain both? Do we prefer one? The CLI path is better for subscription users; the ACP/SDK path is better for ecosystem compatibility.
+5. **Claude auth path: CLI vs SDK.** ~~Our adapter uses CLI wrapping (`claude --output-format stream-json`), which supports subscription auth natively. The ACP adapter uses the SDK. If we're also an ACP client, we'd receive Claude's events via ACP (SDK path). Do we maintain both? Do we prefer one? The CLI path is better for subscription users; the ACP/SDK path is better for ecosystem compatibility.~~
+
+   **RESOLVED:** Both paths coexist. See resolution below.
 
 6. **OAuth for personal use.** The Claude Agent SDK technically supports OAuth via `CLAUDE_CODE_OAUTH_TOKEN` for individual use, but Anthropic officially says SDK = API key only. If a user sets up OAuth personally, it works. Do we document this as a supported path? Or acknowledge it as "works but unsupported"? Risk: Anthropic could break it at any time.
 
@@ -1272,8 +1280,91 @@ The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as de
 
 ### Ecosystem
 
-11. **Non-ACP agents.** Some agents we want to support (GSD, MetaMorph, custom CLI tools) don't speak ACP. Our adapter interface handles these. But if ACP becomes our primary transport, these become second-class citizens. How do we ensure parity? Proposal: our adapter interface IS the abstraction, with an ACP adapter being one implementation. Non-ACP agents use native adapters with the same interface.
+11. **Non-ACP agents.** ~~Some agents we want to support (GSD, MetaMorph, custom CLI tools) don't speak ACP. Our adapter interface handles these. But if ACP becomes our primary transport, these become second-class citizens. How do we ensure parity?~~
+
+    **RESOLVED:** Our adapter interface IS the abstraction. ACP is one adapter implementation among many. See resolution below.
 
 12. **ACP version compatibility.** ACP is evolving (v0.14.x currently). How do we handle breaking changes? Do we pin to a specific ACP version? Support multiple versions? The TypeScript SDK publishes frequently.
 
-13. **Multi-agent with mixed ACP/non-ACP.** If Claude runs via ACP and GSD runs via our native adapter, can they coexist in the same session? The shell groups by adapter, so this should work — but do we need to reconcile different event formats at the event bus level?
+13. **Multi-agent with mixed ACP/non-ACP.** ~~If Claude runs via ACP and GSD runs via our native adapter, can they coexist in the same session?~~
+
+    **RESOLVED:** Yes. All adapters emit `AgentEvent` regardless of their transport. The event bus doesn't care about the source protocol. See resolution below.
+
+---
+
+### Protocol Layering Resolution (Q1, Q2, Q4, Q5, Q11, Q13)
+
+**The key insight:** ACP and AG-UI operate at **different layers** and don't compete. They complement each other.
+
+```
+Layer comparison:
+
+ACP (Zed)                              AG-UI (CopilotKit)
+─────────                              ──────────────────
+Session management (init, modes)       Run lifecycle (start/end)
+Bidirectional (client ↔ agent)         Unidirectional (agent → frontend)
+JSON-RPC 2.0 transport                 Transport-agnostic (SSE, WS, etc.)
+Slash commands, file ops, terminals    Text/tool streaming, state sync
+Editor↔agent communication             Agent↔frontend communication
+```
+
+ACP is a **session/transport protocol** (how to talk to an agent). AG-UI is a **streaming event protocol** (how agent output reaches the UI). They sit at different levels:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  UI Layer                                                  │
+│  React components bind to AgentEvent (our type)            │
+│  which is AG-UI-aligned                                    │
+└──────────────────────┬─────────────────────────────────────┘
+                       │ AgentEvent (10 types, AG-UI-aligned)
+┌──────────────────────▼─────────────────────────────────────┐
+│  Event Bus                                                 │
+│  All adapters normalize to AgentEvent                      │
+└──────┬───────────────┬──────────────────┬──────────────────┘
+       │               │                  │
+┌──────▼──────┐ ┌──────▼──────┐ ┌────────▼────────┐
+│ ACP Adapter │ │ CLI Adapter │ │ SDK Adapter     │
+│ (generic)   │ │ (claude)    │ │ (future agents) │
+│             │ │             │ │                 │
+│ Speaks ACP  │ │ Parses      │ │ Uses native     │
+│ JSON-RPC    │ │ stream-json │ │ SDK callbacks   │
+│ to any ACP  │ │ from claude │ │                 │
+│ agent       │ │ binary      │ │                 │
+└──────┬──────┘ └──────┬──────┘ └────────┬────────┘
+       │               │                  │
+  ACP agents       claude CLI         SDK agents
+  (25+ agents)   (subscription OK)    (API key)
+```
+
+**Decision: Our adapter interface IS the abstraction layer. ACP is one adapter.**
+
+| Question | Resolution |
+|----------|-----------|
+| **Q1: ACP timing** | Build a generic `AcpAdapter` as Phase 6 work (Multi-Agent). It implements our `Adapter` interface by acting as an ACP client. Any ACP agent gets automatic support. No need to rush — our CLI adapter handles Claude today. |
+| **Q2: ACP → CommandContract** | The `AcpAdapter` maps `AvailableCommand` to `CommandContract` on ingest. Mapping: `input` absent → `invocation: undefined` (immediate). `input.hint` present → `invocation: { kind: 'prompt', hint }`. `form` kind is our own extension for adapters that provide richer parameter metadata — ACP agents won't use it unless we extend ACP. |
+| **Q4: AG-UI vs ACP events** | Not competing. ACP `SessionUpdate` events normalize to our `AgentEvent` types (which are AG-UI-aligned). The mapping: `agent_message_chunk` → `text_delta`. `agent_thought_chunk` → `thinking`. `tool_call` → `tool_call` + `tool_result`. `usage_update` → `cost_update`. `plan` → future `plan_update` event. `available_commands_update` → updates adapter's command registry (not an AgentEvent — it's metadata). |
+| **Q5: CLI vs SDK for Claude** | Both coexist as separate adapters. `claude-cli` adapter (CLI wrapping) = primary for subscription users. `acp-claude` adapter (via generic `AcpAdapter`) = available for users who prefer the ACP ecosystem path. User picks in adapter settings. No conflict — they're two adapters for the same underlying agent. |
+| **Q11: Non-ACP agents** | First-class. GSD, MetaMorph, custom tools get native adapters that implement the same `Adapter` interface. The `AcpAdapter` is just one adapter among many. Non-ACP agents are never second-class because the abstraction is at OUR layer, not ACP's. |
+| **Q13: Mixed sessions** | Works naturally. Each adapter emits `AgentEvent` regardless of its transport. The event bus doesn't know or care whether the event originated from ACP JSON-RPC, CLI stdout parsing, or SDK callbacks. Same types, same UI. |
+
+**ACP SessionUpdate → AgentEvent mapping:**
+
+| ACP SessionUpdate | AgentEvent | Notes |
+|-------------------|-----------|-------|
+| `agent_message_chunk` | `text_delta` | ContentChunk text → delta text |
+| `agent_thought_chunk` | `thinking` | Reasoning/planning content |
+| `tool_call` (status: running) | `tool_call` | Initial invocation with input |
+| `tool_call_update` (status: completed) | `tool_result` | Output + success/error |
+| `usage_update` | `cost_update` | Token counts, optional cost |
+| `plan` | *(new event needed)* | Plan entries with status — consider adding `plan_update` to AgentEvent |
+| `available_commands_update` | *(metadata, not event)* | Updates adapter's command registry, triggers UI re-render |
+| `current_mode_update` | *(metadata)* | Updates session mode state |
+| `session_info_update` | *(metadata)* | Updates session title/metadata |
+| Session init response | `session_start` | Model, capabilities, cwd |
+| Session end | `session_end` | Result, cost, duration |
+
+**What this means for implementation priority:**
+
+1. **Now (Phase 2-4):** Build on the CLI adapter. It works, it supports subscriptions, it's implemented.
+2. **Phase 6:** Build the generic `AcpAdapter` as one `Adapter` implementation. Instantly supports 25+ agents.
+3. **Never:** Replace our adapter interface with ACP. Our interface is the abstraction; ACP is a transport.
