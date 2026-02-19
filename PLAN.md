@@ -1254,7 +1254,9 @@ The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as de
 
    **RESOLVED:** The ACP adapter normalizes on ingest. See mapping table below.
 
-3. **ACP Registry vs. our adapter registry.** The ACP Registry (live in Zed + JetBrains) solves agent discovery. Should we consume it directly? Or maintain our own registry that can pull from ACP Registry as one source among others (for non-ACP agents like GSD, MetaMorph)?
+3. **ACP Registry vs. our adapter registry.** ~~The ACP Registry (live in Zed + JetBrains) solves agent discovery. Should we consume it directly? Or maintain our own registry that can pull from ACP Registry as one source among others (for non-ACP agents like GSD, MetaMorph)?~~
+
+   **RESOLVED:** Standards-first. Use ACP Registry as the primary discovery source for ACP-compatible agents. Our `AdapterRegistry` wraps it: ACP Registry provides the catalog of available agents; our registry adds non-ACP agents (GSD, MetaMorph, custom) alongside them. The UI shows one unified list — the user doesn't need to know whether an agent was discovered via ACP Registry or registered locally. Implementation: the `AcpAdapter` fetches from the ACP Registry at startup (or on user request), creates adapter entries for each discovered agent, and registers them alongside native adapters.
 
 4. **AG-UI ↔ ACP event mapping.** ~~We plan to use AG-UI as our internal event wire format. ACP has its own streaming events. If we're an ACP client, we receive ACP events — do we normalize ACP → AG-UI → UI? Or does ACP replace AG-UI as our wire format? This is a two-protocol-or-one decision.~~
 
@@ -1266,17 +1268,57 @@ The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as de
 
    **RESOLVED:** Both paths coexist. See resolution below.
 
-6. **OAuth for personal use.** The Claude Agent SDK technically supports OAuth via `CLAUDE_CODE_OAUTH_TOKEN` for individual use, but Anthropic officially says SDK = API key only. If a user sets up OAuth personally, it works. Do we document this as a supported path? Or acknowledge it as "works but unsupported"? Risk: Anthropic could break it at any time.
+6. **OAuth for personal use.** ~~The Claude Agent SDK technically supports OAuth via `CLAUDE_CODE_OAUTH_TOKEN` for individual use, but Anthropic officially says SDK = API key only. If a user sets up OAuth personally, it works. Do we document this as a supported path? Or acknowledge it as "works but unsupported"? Risk: Anthropic could break it at any time.~~
 
-7. **Auth method declaration in AdapterManifest.** We noted the manifest should declare supported auth methods. What's the schema? Proposal: `authMethods: ('api_key' | 'oauth' | 'browser_login' | 'token' | 'none')[]` on the manifest, plus per-method configuration hints.
+   **RESOLVED:** Don't document it. Don't endorse it. Our primary Claude adapter wraps the CLI, which supports subscription auth natively — no need to push users toward the SDK OAuth workaround. If a user configures `CLAUDE_CODE_OAUTH_TOKEN` themselves, it'll work because the CLI respects it, but we don't mention it in our docs or UI. Avoids any ToS issues if we open-source later.
+
+7. **Auth method declaration in AdapterManifest.** ~~We noted the manifest should declare supported auth methods. What's the schema?~~
+
+   **RESOLVED:** Keep it simple — the adapter declares what auth it needs, the shell renders the appropriate setup UI. Schema:
+
+   ```typescript
+   interface AuthConfig {
+     methods: ('api_key' | 'oauth_browser' | 'token' | 'none')[];
+     // Per-method hints for the settings UI
+     apiKey?: { envVar: string; consoleUrl?: string; label?: string };
+     oauthBrowser?: { loginCommand: string; label?: string };  // e.g. "claude login"
+     token?: { envVar: string; setupCommand?: string; label?: string };
+   }
+   ```
+
+   This lives on `AdapterManifest.auth`. The Claude CLI adapter declares `methods: ['oauth_browser', 'api_key']` with `oauthBrowser: { loginCommand: 'claude login' }`. The ACP adapter for a generic agent declares whatever auth the underlying agent requires. The settings UI reads `auth.methods` and renders the appropriate configuration form (API key input field, "open browser" button, token paste field, or nothing).
 
 ### UI & UX
 
-8. **Context-aware suggestions model & billing.** The v2 LLM-powered action suggestion system needs its own model call. Which model? Whose API key? Is it the same key as the agent's? Or a separate "shell intelligence" key? If the user only has a Claude subscription (no API key), can we still offer suggestions?
+8. **Context-aware suggestions model & billing.** ~~The v2 LLM-powered action suggestion system needs its own model call. Which model? Whose API key? Is it the same key as the agent's? Or a separate "shell intelligence" key? If the user only has a Claude subscription (no API key), can we still offer suggestions?~~
 
-9. **Feature parity communication.** Tier 2 ACP adapters (SDK wrappers like claude-code-acp) don't support all features — no hooks, missing slash commands, partial Plan mode. How do we communicate this in the UI? Grayed-out nav sections? A "capabilities" badge? A "some features unavailable via ACP" warning?
+   **RESOLVED:** No paid API calls for suggestions. The shell must never cost money to use beyond the agent's own usage. Strategy (layered, cheapest first):
 
-10. **Command palette vs. landing view actions.** Commands appear in two places: the command palette (Cmd+K) and the landing view action grid. Are they the same data source? The palette shows all commands; the landing view shows curated/suggested ones. How do we handle the overlap without confusing users?
+   1. **v1: Heuristic ranking (free).** No LLM needed. Rank commands by: recency of use, frequency, context signals (e.g., if git status shows uncommitted files → boost `/commit`; if session just ended → boost `/review-pr`). Simple rules, zero cost.
+   2. **v2: Local model (free).** If a local model is available (Ollama, llama.cpp, MLX), use it for context-aware suggestions. The shell detects local inference endpoints and uses them opportunistically.
+   3. **v3: Piggyback on the agent's model (free to the shell).** If the user has an active agent session, the shell can append a lightweight "suggest next actions" prompt to the agent's next turn. The suggestion comes back as part of the agent's normal response — no extra API call.
+
+   This works for private use AND open source — nobody pays extra for shell intelligence. The heuristic approach (v1) covers 80% of the value. Local models and piggybacking are nice-to-haves.
+
+9. **Feature parity communication.** ~~Tier 2 ACP adapters (SDK wrappers like claude-code-acp) don't support all features — no hooks, missing slash commands, partial Plan mode. How do we communicate this in the UI?~~
+
+   **RESOLVED:** The `AgentCapabilities` system already handles this. Each adapter declares what it supports (`commands: true`, `hooks: false`, etc.). The sidebar nav tree only shows sections for supported capabilities. This means:
+
+   - Claude via CLI adapter → full nav (Sessions, Skills, Commands, MCPs, Hooks, Worktrees)
+   - Claude via ACP adapter → reduced nav (Sessions, Commands — no Hooks, fewer slash commands)
+   - A minimal agent → just Sessions
+
+   No warnings, no grayed-out sections, no "some features unavailable" banners. The UI simply shows what's available. If a user switches from CLI adapter to ACP adapter, they see fewer sections — that's self-explanatory. The adapter picker in settings can show a capabilities comparison to help users choose. Honest UI > apologetic UI.
+
+10. **Command palette vs. landing view actions.** ~~Commands appear in two places: the command palette (Cmd+K) and the landing view action grid. Are they the same data source?~~
+
+    **RESOLVED:** Same data source, different views.
+
+    - **Data source:** `adaptersStore.commands[]` — the unified list of all discovered commands across all adapters.
+    - **Command palette (Cmd+K):** Shows ALL commands, flat list, fuzzy-searchable. Every command from every adapter, grouped by adapter. This is the power-user interface — you know what you want, you search for it.
+    - **Landing view action grid:** Shows a CURATED subset. The curation logic: (1) Adapter-provided `featured` flag on commands. (2) The heuristic ranker from Q8 (frequent/recent/context-relevant). (3) Max ~6-9 visible actions to avoid overwhelming. (4) "Show all" link opens command palette.
+
+    Same commands, different presentation. The palette is the exhaustive index; the landing view is the smart suggestion surface.
 
 ### Ecosystem
 
@@ -1284,7 +1326,9 @@ The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as de
 
     **RESOLVED:** Our adapter interface IS the abstraction. ACP is one adapter implementation among many. See resolution below.
 
-12. **ACP version compatibility.** ACP is evolving (v0.14.x currently). How do we handle breaking changes? Do we pin to a specific ACP version? Support multiple versions? The TypeScript SDK publishes frequently.
+12. **ACP version compatibility.** ~~ACP is evolving (v0.14.x currently). How do we handle breaking changes? Do we pin to a specific ACP version? Support multiple versions? The TypeScript SDK publishes frequently.~~
+
+    **RESOLVED:** Pin to latest stable at time of AcpAdapter implementation (Phase 6). ACP follows semver — minor versions add features, patches fix bugs. Our `AcpAdapter` depends on `@agentclientprotocol/sdk` as a regular npm dependency with a caret range (`^0.14.x`). If ACP ships a breaking major version bump, we add a new adapter version and keep the old one for backwards compat — same pattern as any npm dependency. Don't overthink this until we actually build the adapter; the SDK is still pre-1.0 and may stabilize by then.
 
 13. **Multi-agent with mixed ACP/non-ACP.** ~~If Claude runs via ACP and GSD runs via our native adapter, can they coexist in the same session?~~
 

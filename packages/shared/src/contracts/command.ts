@@ -55,6 +55,9 @@ export const commandContractSchema = z.object({
    *  Defaults to 'immediate' when absent — the command is a one-off action. */
   invocation: invocationModeSchema.optional(),
   keybinding: z.string().optional(),
+  /** Whether this command should appear in the landing view action grid (curated surface).
+   *  Non-featured commands still appear in the command palette (Cmd+K). */
+  featured: z.boolean().default(false),
   source: z.enum(['built_in', 'user_defined', 'plugin', 'autodiscovered']),
   adapterId: z.string(),
   category: z.string().optional(),
