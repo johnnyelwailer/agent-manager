@@ -26,14 +26,48 @@ export const wsUnsubscribeSessionSchema = z.object({
   sessionId: z.string(),
 });
 
+// ---------------------------------------------------------------------------
+// ARO-specific commands (client → server)
+// ---------------------------------------------------------------------------
+
+export const wsSubscribeHostSchema = z.object({
+  type: z.literal('subscribe_host'),
+  hostId: z.string(),
+});
+
+export const wsApproveStepSchema = z.object({
+  type: z.literal('approve_step'),
+  sessionId: z.string(),
+  stepId: z.string(),
+  approved: z.boolean(),
+});
+
+export const wsRequestRoiSchema = z.object({
+  type: z.literal('request_roi'),
+  sessionId: z.string(),
+  hostId: z.string(),
+  selector: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Combined command union
+// ---------------------------------------------------------------------------
+
 export const wsCommandSchema = z.union([
   wsSubscribeAllSchema,
   wsSubscribeSessionSchema,
   wsUnsubscribeAllSchema,
   wsUnsubscribeSessionSchema,
+  // ARO commands
+  wsSubscribeHostSchema,
+  wsApproveStepSchema,
+  wsRequestRoiSchema,
 ]);
 
 export type WsCommand = z.infer<typeof wsCommandSchema>;
+export type WsSubscribeHost = z.infer<typeof wsSubscribeHostSchema>;
+export type WsApproveStep = z.infer<typeof wsApproveStepSchema>;
+export type WsRequestRoi = z.infer<typeof wsRequestRoiSchema>;
 export type WsSubscribeAll = z.infer<typeof wsSubscribeAllSchema>;
 export type WsSubscribeSession = z.infer<typeof wsSubscribeSessionSchema>;
 export type WsUnsubscribeAll = z.infer<typeof wsUnsubscribeAllSchema>;

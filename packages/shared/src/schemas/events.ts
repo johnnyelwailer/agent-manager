@@ -82,6 +82,64 @@ export const agentSubagentEndSchema = baseEventSchema.extend({
 });
 
 // ---------------------------------------------------------------------------
+// ARO-specific event schemas
+// ---------------------------------------------------------------------------
+
+export const aroExecutionPlanEventSchema = baseEventSchema.extend({
+  type: z.literal('execution_plan'),
+  hostId: z.string(),
+  steps: z.array(z.object({
+    id: z.string(),
+    type: z.string(),
+    description: z.string(),
+    command: z.string().optional(),
+  })),
+});
+
+export const aroSecurityVerdictEventSchema = baseEventSchema.extend({
+  type: z.literal('security_verdict'),
+  stepId: z.string(),
+  verdict: z.enum(['approved', 'blocked', 'needs_approval']),
+  reason: z.string(),
+});
+
+export const aroHumanApprovalRequestSchema = baseEventSchema.extend({
+  type: z.literal('human_approval_request'),
+  stepId: z.string(),
+  command: z.string(),
+  riskLevel: z.string(),
+  expiresAt: z.string(),
+});
+
+export const aroHumanApprovalResponseSchema = baseEventSchema.extend({
+  type: z.literal('human_approval_response'),
+  stepId: z.string(),
+  approved: z.boolean(),
+});
+
+export const aroRoiFrameEventSchema = baseEventSchema.extend({
+  type: z.literal('roi_frame'),
+  hostId: z.string(),
+  region: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  }),
+  imageBase64: z.string(),
+  format: z.enum(['jpeg', 'webp', 'png']),
+  capturedAt: z.string(),
+});
+
+export const aroHostAlertEventSchema = baseEventSchema.extend({
+  type: z.literal('host_alert'),
+  hostId: z.string(),
+  alertType: z.string(),
+  message: z.string(),
+  severity: z.enum(['info', 'warning', 'error', 'critical']),
+});
+
+// ---------------------------------------------------------------------------
 // Discriminated union
 // ---------------------------------------------------------------------------
 
@@ -96,6 +154,13 @@ export const agentEventSchema = z.discriminatedUnion('type', [
   agentCostUpdateSchema,
   agentSubagentStartSchema,
   agentSubagentEndSchema,
+  // ARO events
+  aroExecutionPlanEventSchema,
+  aroSecurityVerdictEventSchema,
+  aroHumanApprovalRequestSchema,
+  aroHumanApprovalResponseSchema,
+  aroRoiFrameEventSchema,
+  aroHostAlertEventSchema,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -113,3 +178,9 @@ export type AgentError = z.infer<typeof agentErrorSchema>;
 export type AgentCostUpdate = z.infer<typeof agentCostUpdateSchema>;
 export type AgentSubagentStart = z.infer<typeof agentSubagentStartSchema>;
 export type AgentSubagentEnd = z.infer<typeof agentSubagentEndSchema>;
+export type AroExecutionPlanEvent = z.infer<typeof aroExecutionPlanEventSchema>;
+export type AroSecurityVerdictEvent = z.infer<typeof aroSecurityVerdictEventSchema>;
+export type AroHumanApprovalRequest = z.infer<typeof aroHumanApprovalRequestSchema>;
+export type AroHumanApprovalResponse = z.infer<typeof aroHumanApprovalResponseSchema>;
+export type AroRoiFrameEvent = z.infer<typeof aroRoiFrameEventSchema>;
+export type AroHostAlertEvent = z.infer<typeof aroHostAlertEventSchema>;

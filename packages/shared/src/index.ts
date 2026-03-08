@@ -11,6 +11,13 @@ export {
   agentCostUpdateSchema,
   agentSubagentStartSchema,
   agentSubagentEndSchema,
+  // ARO events
+  aroExecutionPlanEventSchema,
+  aroSecurityVerdictEventSchema,
+  aroHumanApprovalRequestSchema,
+  aroHumanApprovalResponseSchema,
+  aroRoiFrameEventSchema,
+  aroHostAlertEventSchema,
 } from './schemas/events.js';
 
 export {
@@ -58,6 +65,10 @@ export {
   wsSubscribedSchema,
   wsUnsubscribedSchema,
   wsErrorSchema,
+  // ARO WS commands
+  wsSubscribeHostSchema,
+  wsApproveStepSchema,
+  wsRequestRoiSchema,
 } from './schemas/ws.js';
 
 // Types
@@ -73,6 +84,13 @@ export type {
   AgentCostUpdate,
   AgentSubagentStart,
   AgentSubagentEnd,
+  // ARO event types
+  AroExecutionPlanEvent,
+  AroSecurityVerdictEvent,
+  AroHumanApprovalRequest,
+  AroHumanApprovalResponse,
+  AroRoiFrameEvent,
+  AroHostAlertEvent,
 } from './schemas/events.js';
 
 export type {
@@ -116,7 +134,56 @@ export type {
   WsSubscribed,
   WsUnsubscribed,
   WsError,
+  // ARO WS types
+  WsSubscribeHost,
+  WsApproveStep,
+  WsRequestRoi,
 } from './schemas/ws.js';
+
+// ARO schemas
+export {
+  aroRiskLevelSchema,
+  aroSecurityActionSchema,
+  aroSecurityRuleSchema,
+  aroSecurityPolicySchema,
+  aroSecurityVerdictSchema,
+  aroHostStatusSchema,
+  aroHostOsSchema,
+  aroHostConnectionSchema,
+  aroBoundingBoxSchema,
+  aroRoiFormatSchema,
+  aroRoiFrameSchema,
+  aroPlanStepTypeSchema,
+  aroPlanStepSchema,
+  aroExecutionPlanSchema,
+  aroMonitorTypeSchema,
+  aroMonitorConfigSchema,
+  aroAlertSeveritySchema,
+  aroAlertSchema,
+  aroSessionExtraSchema,
+} from './schemas/aro.js';
+
+export type {
+  AroRiskLevel,
+  AroSecurityAction,
+  AroSecurityRule,
+  AroSecurityPolicy,
+  AroSecurityVerdict,
+  AroHostStatus,
+  AroHostOs,
+  AroHostConnection,
+  AroBoundingBox,
+  AroRoiFormat,
+  AroRoiFrame,
+  AroPlanStepType,
+  AroPlanStep,
+  AroExecutionPlan,
+  AroMonitorType,
+  AroMonitorConfig,
+  AroAlertSeverity,
+  AroAlert,
+  AroSessionExtra,
+} from './schemas/aro.js';
 
 // Contracts
 export * from './contracts/index.js';

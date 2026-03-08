@@ -100,6 +100,22 @@ export type {
   HookContract,
 } from './hook.js';
 
+// Host contracts (ARO)
+export {
+  hostContractSchema,
+} from './host.js';
+export type {
+  HostContract,
+} from './host.js';
+
+// Security policy contracts (ARO)
+export {
+  securityPolicyContractSchema,
+} from './security-policy.js';
+export type {
+  SecurityPolicyContract,
+} from './security-policy.js';
+
 // Chat element contracts
 export {
   choiceElementSchema,
