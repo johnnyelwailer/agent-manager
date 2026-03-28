@@ -22,7 +22,15 @@ test.beforeEach(async ({ page }) => {
 
   await page.goto('/snapshots');
   // Wait for the snapshot page content to render
-  await page.waitForSelector('[data-testid="section-primitives"]', { timeout: 10_000 });
+  await page.waitForSelector('[data-testid="section-app-shell"]', { timeout: 10_000 });
+
+  // Stop all intervals/timers that poll connection status — these cause
+  // continuous state updates that prevent Playwright's element stability check
+  // from passing (the connection store polls every 1s).
+  await page.evaluate(() => {
+    const id = window.setInterval(() => {}, 9999);
+    for (let i = 0; i <= id; i++) window.clearInterval(i);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -31,6 +39,58 @@ test.beforeEach(async ({ page }) => {
 
 test('full page', async ({ page }) => {
   await expect(page).toHaveScreenshot('snapshots-full.png', ssOptsFull);
+});
+
+// ---------------------------------------------------------------------------
+// App Shell — High-Level Screens
+// ---------------------------------------------------------------------------
+
+test('app-shell-landing', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-landing"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-landing.png', ssOpts);
+});
+
+test('app-shell-running', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-running"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-running.png', ssOpts);
+});
+
+test('app-shell-completed', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-completed"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-completed.png', ssOpts);
+});
+
+test('app-shell-three-panel', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-three-panel"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-three-panel.png', ssOpts);
+});
+
+test('app-shell-focused', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-focused"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-focused.png', ssOpts);
+});
+
+test('app-shell-collapsed', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-collapsed"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-collapsed.png', ssOpts);
+});
+
+test('app-shell-skills', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-skills"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-skills.png', ssOpts);
+});
+
+test('app-shell-empty', async ({ page }) => {
+  const el = page.locator('[data-testid="ss-shell-empty"]');
+  await el.scrollIntoViewIfNeeded();
+  await expect(el).toHaveScreenshot('shell-empty.png', ssOpts);
 });
 
 // ---------------------------------------------------------------------------

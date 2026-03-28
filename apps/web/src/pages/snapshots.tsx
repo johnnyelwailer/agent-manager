@@ -25,6 +25,7 @@ import type {
   CostTickerElement,
   DiffViewElement,
   ProgressElement,
+  SessionSummary,
 } from '@agent-manager/shared';
 import { Button } from '../components/ui/button.js';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from '../components/ui/card.js';
@@ -46,7 +47,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Toggle } from '../components/ui/toggle.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip.js';
 import { SessionPanel } from '../components/layout/session-panel.js';
+import { AppShell, ShellNavbar, ShellStatusBar } from '../components/layout/app-shell.js';
 import type { SessionInfo } from '@agent-manager/shared';
+import { cn } from '@agent-manager/ui';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -346,6 +349,682 @@ const mockSession: SessionInfo = {
   ],
 };
 
+// Running session variant
+const mockRunningSession: SessionInfo = {
+  sessionId: 'demo-session-running',
+  adapterId: 'claude-code',
+  prompt: 'Add unit tests for the payment processing module',
+  cwd: '/home/user/project',
+  model: 'claude-opus-4-6',
+  status: 'running',
+  startedAt: '2026-02-10T14:00:00Z',
+  costUsd: 0.0312,
+  tokensIn: 8500,
+  tokensOut: 1200,
+  events: [
+    { id: 'r1', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:00Z', type: 'session_start', model: 'claude-opus-4-6', cwd: '/home/user/project' },
+    { id: 'r2', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:01Z', type: 'thinking', text: 'I need to examine the payment processing module to understand what tests to write...' },
+    { id: 'r3', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:02Z', type: 'text_delta', text: "I'll write comprehensive unit tests for the payment module. Let me first look at the existing code." },
+    { id: 'r4', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:03Z', type: 'tool_call', toolUseId: 'tu-r1', toolName: 'Read', input: { file_path: '/home/user/project/src/payments.ts' } },
+    { id: 'r5', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:04Z', type: 'tool_result', toolUseId: 'tu-r1', toolName: 'Read', output: 'export async function processPayment(amount: number, currency: string) {\n  const result = await stripe.charges.create({ amount, currency });\n  return { id: result.id, status: result.status };\n}', isError: false },
+    { id: 'r6', sessionId: 'demo-session-running', timestamp: '2026-02-10T14:00:05Z', type: 'text_delta', text: '\n\nI can see the payment module uses Stripe. Let me write tests covering success and failure scenarios:' },
+  ],
+};
+
+// Session summaries for nav tree
+const mockSessionSummaries: SessionSummary[] = [
+  { sessionId: 'demo-session-running', adapterId: 'claude-code', prompt: 'Add unit tests for the payment processing module', status: 'running', startedAt: '2026-02-10T14:00:00Z', costUsd: 0.0312, eventCount: 6, cwd: '/home/user/project', tokensIn: 8500, tokensOut: 1200 },
+  { sessionId: 'demo-session-1', adapterId: 'claude-code', prompt: 'Help me refactor the authentication module to use JWT tokens', status: 'completed', startedAt: '2026-02-10T12:00:00Z', endedAt: '2026-02-10T12:05:00Z', costUsd: 0.0847, eventCount: 11, cwd: '/home/user/project', tokensIn: 24500, tokensOut: 3200 },
+  { sessionId: 'demo-session-3', adapterId: 'claude-code', prompt: 'Fix the database connection pool leak', status: 'failed', startedAt: '2026-02-10T10:30:00Z', endedAt: '2026-02-10T10:31:00Z', costUsd: 0.0023, eventCount: 4, cwd: '/home/user/project', tokensIn: 1200, tokensOut: 300 },
+  { sessionId: 'demo-session-4', adapterId: 'claude-code', prompt: 'Set up CI/CD pipeline with GitHub Actions', status: 'completed', startedAt: '2026-02-09T16:00:00Z', endedAt: '2026-02-09T16:20:00Z', costUsd: 0.2145, eventCount: 38, cwd: '/home/user/project', tokensIn: 62000, tokensOut: 8400 },
+  { sessionId: 'demo-session-5', adapterId: 'aider', prompt: 'Migrate from Express to Hono framework', status: 'starting', startedAt: '2026-02-10T14:05:00Z', costUsd: 0, eventCount: 0, cwd: '/home/user/project', tokensIn: 0, tokensOut: 0 },
+];
+
+// ---------------------------------------------------------------------------
+// Hierarchical semantic navigation tree
+// ---------------------------------------------------------------------------
+
+const statusDotClass: Record<string, string> = {
+  running: 'bg-blue-500 animate-pulse',
+  completed: 'bg-green-500',
+  failed: 'bg-red-500',
+  starting: 'bg-amber-500',
+  interrupted: 'bg-muted-foreground',
+  connected: 'bg-green-500',
+  error: 'bg-red-500',
+  connecting: 'bg-amber-500',
+  clean: 'bg-green-500',
+  dirty: 'bg-amber-500',
+  conflict: 'bg-red-500',
+  detached: 'bg-muted-foreground',
+};
+
+function TreeRow({
+  indent,
+  expanded,
+  dot,
+  label,
+  badge,
+  selected,
+  dimmed,
+}: {
+  indent: number;
+  expanded?: boolean | null | undefined;
+  dot?: string | undefined;
+  label: string;
+  badge?: string | undefined;
+  selected?: boolean | undefined;
+  dimmed?: boolean | undefined;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 rounded-md py-1 text-xs',
+        selected ? 'bg-accent text-accent-foreground' : 'text-foreground/80',
+        dimmed && 'opacity-50',
+      )}
+      style={{ paddingLeft: `${indent * 12 + 8}px`, paddingRight: '8px' }}
+    >
+      {expanded !== null && expanded !== undefined ? (
+        <span className="w-3 shrink-0 text-center text-[10px] text-muted-foreground">
+          {expanded ? '\u25BC' : '\u25B6'}
+        </span>
+      ) : (
+        <span className="w-3 shrink-0" />
+      )}
+      {dot && <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />}
+      <span className="truncate">{label}</span>
+      {badge && (
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{badge}</span>
+      )}
+    </div>
+  );
+}
+
+// Adapter-provided skills for nav tree and command actions
+const mockAdapterSkills = [
+  { id: 'plan', cmd: '/plan', label: 'Plan implementation' },
+  { id: 'review', cmd: '/review', label: 'Review code' },
+  { id: 'commit', cmd: '/commit', label: 'Git commit' },
+  { id: 'debug', cmd: '/debug', label: 'Debug issue' },
+  { id: 'test', cmd: '/test', label: 'Run tests' },
+  { id: 'refactor', cmd: '/refactor', label: 'Refactor code' },
+];
+
+// Adapter-provided workflows (multi-phase operations)
+const mockWorkflows = [
+  { id: 'wf-1', name: 'Implement auth flow', phase: 'execute' as const, progress: 65, status: 'running' },
+  { id: 'wf-2', name: 'Fix CSS layout overflow', phase: 'verify' as const, progress: 100, status: 'completed' },
+];
+
+const claudeSessions = mockSessionSummaries.filter((s) => s.adapterId === 'claude-code');
+const aiderSessions = mockSessionSummaries.filter((s) => s.adapterId === 'aider');
+
+interface NavTreeConfig {
+  expandSessions?: boolean;
+  expandWorkflows?: boolean;
+  expandSkills?: boolean;
+  expandMcp?: boolean;
+  expandAider?: boolean;
+  expandWorkspaces?: boolean;
+  selectedNode?: string;
+  empty?: boolean;
+}
+
+function MockNavTree({
+  expandSessions = true,
+  expandWorkflows = false,
+  expandSkills = false,
+  expandMcp = false,
+  expandAider = false,
+  expandWorkspaces = true,
+  selectedNode,
+  empty = false,
+}: NavTreeConfig) {
+  return (
+    <div className="flex h-full flex-col py-2">
+      {empty ? (
+        <div className="flex flex-1 items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">No agents connected</p>
+            <p className="mt-1 text-[10px] text-muted-foreground/60">
+              Configure an adapter to get started
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {/* AGENTS section */}
+          <div className="px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Agents
+            </span>
+          </div>
+
+          {/* claude-code adapter */}
+          <TreeRow indent={0} expanded={true} dot={statusDotClass.connected} label="claude-code" />
+
+          <TreeRow
+            indent={1}
+            expanded={expandSessions}
+            label="Sessions"
+            badge={expandSessions ? undefined : String(claudeSessions.length)}
+          />
+          {expandSessions &&
+            claudeSessions.map((s) => (
+              <TreeRow
+                key={s.sessionId}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                label={s.prompt}
+                selected={selectedNode === `session:${s.sessionId}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandWorkflows}
+            label="Workflows"
+            badge={expandWorkflows ? undefined : String(mockWorkflows.length)}
+          />
+          {expandWorkflows &&
+            mockWorkflows.map((wf) => (
+              <TreeRow
+                key={wf.id}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[wf.status] ?? 'bg-muted-foreground'}
+                label={`${wf.name} \u2014 ${wf.phase}`}
+                badge={`${wf.progress}%`}
+                selected={selectedNode === `workflow:${wf.id}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandSkills}
+            label="Skills"
+            badge={expandSkills ? undefined : String(mockAdapterSkills.length)}
+          />
+          {expandSkills &&
+            mockAdapterSkills.map((skill) => (
+              <TreeRow
+                key={skill.id}
+                indent={2}
+                expanded={null}
+                label={`${skill.cmd} \u2014 ${skill.label}`}
+                selected={selectedNode === `skill:${skill.id}`}
+              />
+            ))}
+
+          <TreeRow
+            indent={1}
+            expanded={expandMcp}
+            label="MCP Servers"
+            badge={expandMcp ? undefined : String(mockMcpServers.length)}
+          />
+          {expandMcp &&
+            mockMcpServers.map((s) => (
+              <TreeRow
+                key={s.id}
+                indent={2}
+                expanded={null}
+                dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                label={s.name}
+                badge={`${s.tools.length} tools`}
+              />
+            ))}
+
+          {/* aider adapter */}
+          <TreeRow
+            indent={0}
+            expanded={expandAider}
+            dot={statusDotClass.starting}
+            label="aider"
+            dimmed
+          />
+          {expandAider && (
+            <>
+              <TreeRow indent={1} expanded={true} label="Sessions" />
+              {aiderSessions.map((s) => (
+                <TreeRow
+                  key={s.sessionId}
+                  indent={2}
+                  expanded={null}
+                  dot={statusDotClass[s.status] ?? 'bg-muted-foreground'}
+                  label={s.prompt}
+                  selected={selectedNode === `session:${s.sessionId}`}
+                />
+              ))}
+            </>
+          )}
+
+          {/* WORKSPACES section */}
+          <div className="mt-3 px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Workspaces
+            </span>
+          </div>
+          {mockWorktrees.map((wt) => (
+            <TreeRow
+              key={wt.id}
+              indent={0}
+              expanded={null}
+              dot={statusDotClass[wt.status] ?? 'bg-muted-foreground'}
+              label={wt.branch}
+              badge={wt.changedFiles > 0 ? `${wt.changedFiles} files` : wt.status}
+              selected={selectedNode === `workspace:${wt.id}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Settings at bottom */}
+      <div className="border-t border-border px-2 pt-2">
+        <TreeRow indent={0} expanded={null} label="Settings" selected={selectedNode === 'settings'} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Context-sensitive command actions (adapter-provided, predicted)
+// ---------------------------------------------------------------------------
+
+function MockCommandActions() {
+  const workflows = [
+    {
+      id: 'plan-build',
+      name: 'Plan & Build',
+      description: 'Design the approach, implement changes, verify correctness',
+      phases: ['plan', 'execute', 'verify'],
+    },
+    {
+      id: 'code-review',
+      name: 'Code Review',
+      description: 'Analyze changes, suggest improvements, apply fixes',
+      phases: ['plan', 'execute', 'verify'],
+    },
+    {
+      id: 'debug-fix',
+      name: 'Debug & Fix',
+      description: 'Investigate the issue, create a fix, run tests',
+      phases: ['plan', 'execute', 'verify'],
+    },
+  ];
+
+  const quickCommands = ['/commit', '/test', '/refactor', '/review'];
+
+  const contextHints = [
+    { text: 'feature/auth has 5 uncommitted files', status: 'warning' as const },
+    { text: 'postgres MCP server: connection refused', status: 'error' as const },
+    { text: 'Implement auth flow \u2014 execute phase (65%)', status: 'info' as const },
+  ];
+
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="w-full max-w-lg space-y-6">
+        {/* Provider */}
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span className="text-xs font-medium text-muted-foreground">claude-code</span>
+        </div>
+
+        {/* Adapter workflows */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Workflows</h2>
+          <div className="mt-3 space-y-2">
+            {workflows.map((wf) => (
+              <div
+                key={wf.id}
+                className="rounded-lg border border-border px-3 py-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">{wf.name}</span>
+                  <div className="flex items-center gap-1">
+                    {wf.phases.map((phase, i) => (
+                      <div
+                        key={phase}
+                        className={cn(
+                          'h-1.5 rounded-full',
+                          i === 0 ? 'w-4 bg-foreground/20' : 'w-3 bg-foreground/10',
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <span className="mt-0.5 text-xs text-muted-foreground">{wf.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick commands */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Quick Commands</h2>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {quickCommands.map((cmd) => (
+              <span
+                key={cmd}
+                className="rounded-md border border-border px-2.5 py-1 text-xs font-mono text-foreground/80"
+              >
+                {cmd}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Context */}
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Context</h2>
+          <div className="mt-2 space-y-1.5">
+            {contextHints.map((hint, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    hint.status === 'error'
+                      ? 'bg-red-500'
+                      : hint.status === 'warning'
+                        ? 'bg-amber-500'
+                        : 'bg-blue-500',
+                  )}
+                />
+                <span>{hint.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Composer */}
+        <div className="flex items-end gap-2">
+          <div className="min-h-[40px] flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-muted-foreground">
+            Ask anything or type / for commands...
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detail panel — tasks, skills, MCP, hooks (no pricing)
+// ---------------------------------------------------------------------------
+
+function MockDetailContent() {
+  const phases = [
+    { id: 'plan', label: 'Plan', status: 'completed' as const },
+    { id: 'execute', label: 'Execute', status: 'running' as const },
+    { id: 'verify', label: 'Verify', status: 'pending' as const },
+  ];
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">Workflow Context</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Workflow phase progress */}
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Implement Auth Flow
+          </h3>
+          <div className="mt-2 space-y-1.5">
+            {phases.map((phase) => (
+              <div key={phase.id} className="flex items-center gap-2 text-xs">
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    phase.status === 'completed'
+                      ? 'bg-green-500'
+                      : phase.status === 'running'
+                        ? 'bg-blue-500 animate-pulse'
+                        : 'bg-muted-foreground/30',
+                  )}
+                />
+                <span
+                  className={cn(
+                    phase.status === 'running'
+                      ? 'font-medium text-foreground'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {phase.label}
+                </span>
+                {phase.status === 'running' && (
+                  <span className="ml-auto text-[10px] text-muted-foreground">65%</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <Separator />
+
+        {/* Tasks in current phase */}
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Tasks
+          </h3>
+          <div className="mt-2 space-y-2">
+            {mockTasks.slice(0, 2).map((task) => (
+              <TaskCard key={task.id} task={task} compact />
+            ))}
+          </div>
+        </div>
+        <Separator />
+
+        {/* Research docs produced by the workflow */}
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Research
+          </h3>
+          <div className="mt-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[9px] px-1 py-0">plan</Badge>
+              <span>Authentication Architecture</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[9px] px-1 py-0">analysis</Badge>
+              <span>Existing auth flow audit</span>
+            </div>
+          </div>
+        </div>
+        <Separator />
+
+        {/* MCP Servers */}
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            MCP Servers
+          </h3>
+          <div className="mt-2 space-y-1">
+            {mockMcpServers.map((s) => (
+              <div key={s.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    s.status === 'connected'
+                      ? 'bg-green-500'
+                      : s.status === 'error'
+                        ? 'bg-red-500'
+                        : 'bg-amber-500',
+                  )}
+                />
+                <span>{s.name}</span>
+                <span className="ml-auto text-[10px]">{s.tools.length} tools</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Navbar — branding + connection status
+// ---------------------------------------------------------------------------
+
+function MockNavbar() {
+  return (
+    <ShellNavbar
+      leading={<span className="text-sm font-semibold text-foreground">Agent Manager</span>}
+      trailing={
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span>Connected</span>
+        </div>
+      }
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Status bar — workspace context (no pricing)
+// ---------------------------------------------------------------------------
+
+function MockStatusBar() {
+  return (
+    <ShellStatusBar>
+      <span>claude-code</span>
+      <span className="text-border">|</span>
+      <span>feature/auth</span>
+      <span className="text-border">|</span>
+      <span>execute phase</span>
+      <span className="text-border">|</span>
+      <span>3 MCP servers</span>
+      <span className="flex-1" />
+      <span>v0.1.0</span>
+    </ShellStatusBar>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Static chat panel (no cost ticker, no assistant-ui runtime)
+// ---------------------------------------------------------------------------
+
+function MockChatPanel({
+  session,
+  variant = 'completed',
+}: {
+  session: SessionInfo;
+  variant?: 'running' | 'completed';
+}) {
+  const events = (session.events ?? []) as Array<Record<string, any>>;
+  const thinkingText =
+    events.find((e) => e.type === 'thinking')?.text ?? 'Analyzing the request...';
+  const assistantText =
+    events
+      .filter((e) => e.type === 'text_delta')
+      .map((e) => e.text)
+      .join('') || 'Working on the task...';
+  const toolCalls = events.filter((e) => e.type === 'tool_call');
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Header — adapter + model + status, no cost */}
+      <div className="border-b border-border px-4 py-3">
+        <div className="truncate text-sm font-medium text-foreground">{session.prompt}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{session.adapterId}</span>
+          <span>&middot;</span>
+          {session.model && (
+            <>
+              <span>{session.model}</span>
+              <span>&middot;</span>
+            </>
+          )}
+          <Badge
+            variant={variant === 'running' ? 'secondary' : 'outline'}
+            className="text-[10px] px-1.5 py-0"
+          >
+            {session.status}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Message thread */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-3">
+          <div className="rounded-lg bg-muted/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground italic">{thinkingText}</p>
+          </div>
+        </div>
+        <div className="px-4 py-2">
+          <div className="text-sm text-foreground">{assistantText}</div>
+        </div>
+        {toolCalls.map((e) => (
+          <div key={e.id} className="px-4 py-1">
+            <ToolCallViewer
+              element={{
+                type: 'tool_call',
+                id: e.id,
+                toolName: e.toolName,
+                input: e.input,
+                output:
+                  events.find((r) => r.type === 'tool_result' && r.toolUseId === e.toolUseId)
+                    ?.output ?? '',
+                collapsed: true,
+                isError: false,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-border bg-background px-4 py-3">
+        <div className="flex items-end gap-2">
+          <div className="min-h-[40px] flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-muted-foreground">
+            Send a message...
+          </div>
+          {variant === 'running' ? (
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-destructive text-destructive-foreground">
+              <div className="h-4 w-4 rounded-sm bg-current" />
+            </div>
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 12h14m-7-7l7 7-7 7"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty / welcome state
+// ---------------------------------------------------------------------------
+
+function MockEmptyWelcome() {
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-foreground">Welcome to Agent Manager</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Connect an adapter to start managing your AI agents.
+        </p>
+        <div className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          Configure Adapter
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot page component
 // ---------------------------------------------------------------------------
@@ -363,6 +1042,158 @@ export function SnapshotsPage() {
             Visual showcase of every component with sample data
           </p>
         </div>
+
+        {/* ============================================================= */}
+        {/* HIGH-LEVEL SCREENS — Full app shell layouts                   */}
+        {/* ============================================================= */}
+        <Section title="App Shell — High-Level Screens" testId="section-app-shell">
+
+          {/* ---- 1. Landing — Nav tree + adapter workflows ---- */}
+          <SubSection title="Landing — Nav Tree + Adapter Workflows" testId="ss-shell-landing">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree
+                    expandSessions={true}
+                    expandWorkflows={true}
+                    expandWorkspaces={true}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockCommandActions />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 2. Running session ---- */}
+          <SubSection title="Nav Tree + Running Session" testId="ss-shell-running">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree
+                    expandSessions={true}
+                    selectedNode="session:demo-session-running"
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockRunningSession} variant="running" />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 3. Completed session ---- */}
+          <SubSection title="Nav Tree + Completed Session" testId="ss-shell-completed">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree expandSessions={true} selectedNode="session:demo-session-1" />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 4. 3-Panel: Nav tree + Chat + Detail ---- */}
+          <SubSection title="3-Panel — Nav Tree + Chat + Context" testId="ss-shell-three-panel">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main-detail"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree expandSessions={true} selectedNode="session:demo-session-1" />
+                }
+                detail={<MockDetailContent />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 5. Focused mode — chat only ---- */}
+          <SubSection title="Focused Mode — Chat Only" testId="ss-shell-focused">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="focused"
+                navbar={<MockNavbar />}
+                sidebar={<MockNavTree />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 6. Collapsed sidebar ---- */}
+          <SubSection title="Collapsed Sidebar" testId="ss-shell-collapsed">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                defaultSidebarCollapsed={true}
+                navbar={<MockNavbar />}
+                sidebar={<MockNavTree />}
+                statusBar={<MockStatusBar />}
+              >
+                <MockChatPanel session={mockSession} />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 7. Skills + MCP expanded in nav tree ---- */}
+          <SubSection title="Nav Tree — Skills + MCP Expanded" testId="ss-shell-skills">
+            <div className="h-[600px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={<MockNavbar />}
+                sidebar={
+                  <MockNavTree
+                    expandSessions={false}
+                    expandSkills={true}
+                    expandMcp={true}
+                  />
+                }
+                statusBar={<MockStatusBar />}
+              >
+                <MockCommandActions />
+              </AppShell>
+            </div>
+          </SubSection>
+
+          {/* ---- 8. Empty state — no agents ---- */}
+          <SubSection title="Empty State — No Agents" testId="ss-shell-empty">
+            <div className="h-[500px] rounded-xl border border-border overflow-hidden">
+              <AppShell
+                defaultLayout="sidebar-main"
+                navbar={
+                  <ShellNavbar
+                    leading={
+                      <span className="text-sm font-semibold text-foreground">Agent Manager</span>
+                    }
+                    trailing={
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                        <span>Disconnected</span>
+                      </div>
+                    }
+                  />
+                }
+                sidebar={<MockNavTree empty />}
+              >
+                <MockEmptyWelcome />
+              </AppShell>
+            </div>
+          </SubSection>
+        </Section>
 
         {/* ============================================================= */}
         {/* SHADCN PRIMITIVES */}

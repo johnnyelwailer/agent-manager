@@ -68,6 +68,54 @@ describe('CommandContract', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses command without invocation (defaults to immediate)', () => {
+    const result = commandContractSchema.safeParse(validCommand);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.invocation).toBeUndefined();
+    }
+  });
+
+  it('parses immediate invocation', () => {
+    const result = commandContractSchema.safeParse({
+      ...validCommand,
+      invocation: { kind: 'immediate' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses prompt invocation with hint', () => {
+    const result = commandContractSchema.safeParse({
+      ...validCommand,
+      name: 'plan',
+      invocation: { kind: 'prompt', hint: 'What should I plan?' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.invocation).toEqual({ kind: 'prompt', hint: 'What should I plan?' });
+    }
+  });
+
+  it('parses form invocation with field subset', () => {
+    const result = commandContractSchema.safeParse({
+      ...validCommand,
+      parameters: [
+        { name: 'message', type: 'string', required: true },
+        { name: 'scope', type: 'choice', choices: ['patch', 'minor', 'major'] },
+      ],
+      invocation: { kind: 'form', fields: ['message'] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid invocation kind', () => {
+    const result = commandContractSchema.safeParse({
+      ...validCommand,
+      invocation: { kind: 'invalid' },
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('discriminates specializations', () => {
     const claude = specializedCommandContractSchema.safeParse({
       ...validCommand,

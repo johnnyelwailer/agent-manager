@@ -37,7 +37,8 @@ The space is crowded but fragmented. Every tool occupies a specific niche. Nothi
 **4. Autonomous Agent Platforms (opinionated, closed)**
 - **Devin** — full VM-based autonomous agent. Rich UI (planner, timeline, browser, editor). But it's *Devin's* UI for *Devin's* agent. Not extensible. Not a shell.
 - **Jules** — Google's async agent. Cloud-only. Rich activity model. But closed platform.
-- **OpenAI Codex App** (macOS, Feb 2026) — multi-agent management, skills as first-class objects. But OpenAI-only.
+- **OpenAI Codex App** (macOS, Electron, Feb 2026) — three-panel layout (sidebar + conversation + diff review). Thread-per-task with Local/Worktree/Cloud execution targets. `Cmd+K` palette + `/` commands + `$` skills. Inline diff review with per-chunk staging and inline comments. Pop-out threads to floating windows. Automations with Triage inbox. Cross-surface sync (CLI ↔ IDE ↔ app). Best-in-class code review UX. But: **OpenAI-only**, **macOS-only**, **single-agent model** (no multi-vendor adapters), no workflow plugins, no remote web access.
+- **Google Antigravity** (cross-platform, VS Code fork, Nov 2025) — dual-window architecture (Editor View + Agent Manager). Agent Manager is a three-column mission control (Workspaces | Inbox | Conversation). Artifacts as first-class objects (plans, diffs, screenshots, browser recordings). Google Docs-style inline comments on agent output. Per-task model switching. Development mode presets (Autonomous/Assisted/Supervised). Up to 5 parallel agents. But: **VS Code fork** (you must use their IDE), **Google ecosystem first** (Gemini default, other models secondary), no custom adapter system, no standards-based extensibility, no workflow plugins.
 
 **5. Agent Frameworks / SDKs (developer tools, not end-user UIs)**
 - **OpenHands** (64k stars) — event-sourced SDK + web UI. Modular V1 architecture. But the UI is a single-agent coding interface, not a multi-agent project shell.
@@ -63,6 +64,8 @@ The space is crowded but fragmented. Every tool occupies a specific niche. Nothi
 | IDE extensions with agent features | A standalone shell that works with *any* editor/terminal |
 | TUI session managers for multi-agent | Rich graphical UI for agent concepts (skills, MCPs, hooks, workflows) |
 | Conductor (parallel Claude/Codex, polished UI) | **Agent-agnostic** orchestration (not locked to 2 agents). **Pluggable workflows** (not one fixed flow). **Standards-based** extensibility. Cross-platform + remote access. |
+| Codex App (best code review UX, thread management) | Not locked to OpenAI. Not macOS-only. Same quality diff review + thread model, but for any agent. |
+| Antigravity (best agent orchestration UX, inbox metaphor) | Not a VS Code fork. Not Google-first. Same mission control quality, but editor-agnostic and adapter-based. |
 | Opinionated agent platforms (Devin, Jules) | An *open*, *extensible* shell that any agent can plug into |
 | Agent frameworks for developers | An *end-user* product for managing project-level agent work |
 | Per-agent UIs (each agent has its own) | A *unified* UI that renders any agent's concepts through contracts |
@@ -192,6 +195,128 @@ Think of it as the **desktop environment for AI agents**:
     │         │            │             │
  claude    gsd run      mm exec     user-defined
 ```
+
+## App Shell Design
+
+The app shell is the outermost layout chrome — navbar, sidebar, status bar, and panel arrangement. It is intentionally **dumb**: it renders content grouped by adapter but has no opinion about what adapters do or how they work. All intelligence lives in the adapters; the shell is just a frame.
+
+### Core Principles
+
+1. **Shell is a dumb renderer.** The shell provides layout (sidebar, main, detail panels), navigation, and grouping. It does not interpret adapter content — it receives structured data and renders it.
+2. **Adapters drive content.** Each adapter declares what it supports via `AgentCapabilities`. The shell uses this to decide which nav sections to show (Sessions, Skills, MCP Servers, Hooks, Worktrees) per adapter.
+3. **Default renderer with adapter override.** Every content type has a default renderer (e.g., sessions render as chat threads). Adapters can optionally provide richer views when they have something better to offer. Files open predictably; adapters enhance progressively.
+
+### Multi-Adapter Concurrency
+
+Multiple adapters (and workflow extensions layered on the same base adapter) run **fully concurrently**. The shell handles this by:
+
+- **Grouping by adapter.** The nav tree organizes all content under its owning adapter. Sessions, skills, workflows, MCP servers — everything is scoped to the adapter that provides it.
+- **Primary vs. background awareness.** Each adapter can detect whether it's the **primary active** adapter (e.g., because the user initiated a session through it directly) or **backgrounded** (another adapter took over the user's focus). This distinction affects which actions an adapter surfaces — the primary adapter shows its full action set, while backgrounded adapters show minimal or contextual actions only.
+- **Shell renders both.** When multiple adapters are active, the shell renders all of their content, grouped by adapter. There is no conflict resolution at the shell level — if two adapters both provide suggested actions, both sets appear (grouped under their respective adapter headers). The user disambiguates by context.
+
+This means a workflow extension like GSD that runs **within** Claude Code is handled entirely by Claude — the shell doesn't need to know about GSD's internals. If a separate adapter (e.g., `aider`) is also running, its content appears in its own nav tree section.
+
+### AgentCapabilities
+
+Each adapter declares its capabilities in the manifest:
+
+```typescript
+interface AgentCapabilities {
+  streaming: boolean;        // real-time event output
+  interruptible: boolean;    // can be interrupted mid-task
+  commands: boolean;         // supports slash commands
+  skills: boolean;           // supports skills
+  mcps: boolean;             // supports MCP servers
+  hooks: boolean;            // supports lifecycle hooks
+  worktrees: boolean;        // supports multiple worktrees
+  costTracking: boolean;     // reports token/cost data
+  subagents: boolean;        // can spawn sub-agents
+  autodiscovery: boolean;    // can enumerate its own capabilities
+}
+```
+
+The sidebar nav tree only shows sections for capabilities the adapter actually supports. An adapter that doesn't support MCP won't have an "MCP Servers" section. An adapter that doesn't support skills won't show a "Skills" section. This keeps the UI honest — you only see what's real.
+
+### Nav Tree Structure
+
+```
+AGENTS
+├── claude-code (●connected)
+│   ├── Sessions (expandable)
+│   │   ├── ● Add unit tests for payment... (running)
+│   │   ├── ● Refactor auth module... (completed)
+│   │   └── ● Fix database pool leak... (failed)
+│   ├── Workflows (if adapter.capabilities → supported)
+│   ├── Skills (if adapter.capabilities.skills)
+│   └── MCP Servers (if adapter.capabilities.mcps)
+├── aider (●starting, dimmed)
+│   └── Sessions
+│       └── ● Migrate from Express... (starting)
+WORKSPACES
+├── ● main (clean)
+├── ● feature/auth (dirty, 5 files)
+└── ● fix/overflow (conflict)
+Settings
+```
+
+### Session Context in Sidebar
+
+Sessions in the nav tree show meaningful context beyond just the adapter ID:
+- **Prompt snippet** — truncated first line of the task prompt
+- **Status indicator** — color-coded dot (running/completed/failed/starting)
+- **Model** — which model is being used (when relevant)
+- **Working directory** — the cwd context for the session
+
+### Command Actions (Landing View)
+
+When no session is selected, the main panel shows adapter-provided actions:
+- **Workflows** — multi-phase operations the adapter supports (Plan & Build, Code Review, Debug & Fix)
+- **Quick Commands** — slash commands from adapter discovery (`/commit`, `/test`, `/refactor`)
+- **Context hints** — environmental awareness (uncommitted files, MCP errors, active workflow progress)
+- **Composer** — prompt input to start a new session
+
+These actions are grouped by adapter. When multiple adapters are active, each adapter's actions appear under its own header. The primary adapter's actions appear first/prominently.
+
+#### Command Invocation Modes
+
+Not every command is a fire-and-forget button press. The `invocation` field on `CommandContract` (aligned with ACP's `AvailableCommand.input`) determines how each command is rendered and triggered:
+
+| Mode | When | UI Rendering | Example |
+|------|------|-------------|---------|
+| **`immediate`** (or absent) | No user input needed | Single-click chip/button | `/compact`, `/clear`, `/stop` |
+| **`prompt`** | Requires free-form text | Chip → inline input field with `hint` placeholder | `/plan` → "What should I plan?", `/search` → "Search query" |
+| **`form`** | Requires structured parameters | Chip → mini-form with named fields | `/deploy` → [env: staging/prod] [branch: ___] |
+
+This prevents the "waste tokens" problem where invoking a prompt-requiring command with no input causes the agent to hallucinate or request clarification on its first turn. The shell can enforce: don't submit a `prompt` command with empty input.
+
+#### Context-Aware Action Suggestions (v2)
+
+**Beyond static command lists:** Instead of showing all available commands equally, the shell can use a lightweight model to suggest contextually relevant actions based on the current conversation state.
+
+**How it works:**
+1. Agent adapters advertise their available commands via ACP's `AvailableCommandsUpdate` (or our equivalent)
+2. The shell maintains conversation context: recent messages, active session state, visible files, git status
+3. A small/fast LLM (Haiku-class) reads the context and the available command list, then returns a ranked subset with pre-filled prompt suggestions
+
+**Example flow:**
+```
+Context: User just reviewed a PR and the agent showed 3 failing tests.
+
+Available commands: /plan, /commit, /test, /review-pr, /compact, /help, ...
+
+LLM suggestion:
+  1. /test  → "Re-run the 3 failing tests after the fix"  [immediate]
+  2. /plan  → "Fix the test failures in auth.test.ts"       [pre-filled prompt]
+  3. /commit → "Commit the PR review changes"               [pre-filled prompt]
+```
+
+**Design constraints:**
+- The LLM call must be **non-blocking** — the static command list always renders immediately, suggestions overlay/reorder asynchronously
+- **Caching** — same context fingerprint → skip the LLM call
+- **Cost-conscious** — Haiku-class model, aggressive prompt compression, only trigger on meaningful context changes (not every keystroke)
+- **Fallback** — if the LLM call fails or times out, the UI shows the default alphabetical/grouped command list
+
+**This is a v2 feature.** For v1, the shell renders commands statically using the `invocation` metadata. Context-aware suggestions are an enhancement once the command system is stable.
 
 ## Agent UI Component System
 
@@ -900,12 +1025,8 @@ agent-manager/
 │   │   ├── src/
 │   │   │   ├── main.tsx
 │   │   │   ├── routes/         # TanStack Router file-based routes
-│   │   │   │   ├── __root.tsx
-│   │   │   │   ├── index.tsx   # → redirect to /ops
-│   │   │   │   ├── ops.tsx
-│   │   │   │   ├── kanban.tsx
-│   │   │   │   ├── brief.tsx
-│   │   │   │   └── settings.tsx
+│   │   │   │   ├── __root.tsx  # App shell: sidebar tree + content pane
+│   │   │   │   └── index.tsx   # Single route — sidebar tree drives content
 │   │   │   ├── components/
 │   │   │   │   ├── layout/     # Responsive shell (sidebar, nav, panels)
 │   │   │   │   ├── ui/         # shadcn primitives (re-exported from packages/ui)
@@ -1027,15 +1148,16 @@ Stand up the real React app with routing, components, and live data. Responsive 
 | Task | Description |
 |------|-------------|
 | Init `apps/web` | Vite 7 + React 19 + TW4 + shadcn/ui |
-| TanStack Router | File-based routes: `/ops`, `/kanban`, `/brief`, `/settings` |
-| Responsive shell | Adaptive layout: multi-panel (desktop) → stacked (tablet) → single + drawer (mobile). Bottom nav on mobile. |
+| App shell | Sidebar tree (left) + content pane (right). No tabs, no header toggle. Tree drives all navigation. |
+| Sidebar tree | Expandable/collapsible sections: Sessions, Board, Adapters, Projects, MCPs, Settings. Capability-driven (sections only appear if adapters support them). Status badges on session nodes. |
+| Content pane renderers | Landing (nothing selected), Session inbox (Sessions header), Session view (specific session: conversation + review panel), Kanban (Board), Adapter/Project/MCP detail views, Settings. |
+| Responsive shell | Desktop: tree + content visible. Tablet: tree collapses to icon rail. Mobile: tree is slide-out drawer, review panel is bottom sheet. |
 | Hono RPC client | Typed API client generated from server routes |
 | WebSocket store | Zustand store for connection + real-time events |
 | Session store | Zustand store for sessions, tasks, workflow state |
 | Adapter store | Zustand store for adapter registry, capabilities, discovered commands/skills/MCPs |
-| Ops view | Port design from prototype, wire to live stores, responsive layout |
-| Kanban view | Port design from prototype, wire to live stores, responsive layout |
-| Brief/dispatch view | Session creation: pick adapter, enter prompt, configure, launch. Adapter capability-aware. |
+| Navigation store | Zustand store for sidebar tree selection state (which node is active → determines content pane) |
+| Command palette | `Cmd+K` overlay. All commands from `adaptersStore.commands[]`, fuzzy-searchable, grouped by adapter. |
 
 ### Phase 4: Claude Auto-Discovery + End-to-End Flow
 
@@ -1110,12 +1232,504 @@ Enable web-based remote access and wrap in Tauri for native desktop.
 | Performance | Bundle splitting, virtual scrolling for large event streams, WebSocket backpressure |
 | Documentation | User guide, developer guide, API reference |
 
-## Key UI Views (from prototype exploration)
+## UI Architecture
 
-| View | Role | Design Reference |
-|------|------|------------------|
-| **Ops** | Primary working view | `prototype/src/variants/ops/` |
-| **Kanban** | Overview/triage board | `prototype/src/variants/kanban/` |
-| **Brief** | Session start/dispatch | `prototype/src/variants/startup-brief/` |
+### Design References
 
-The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app extracts the Ops/Kanban/Brief designs into `apps/web/` with proper architecture.
+Two apps define the interaction patterns we're adopting:
+
+**Codex Desktop (OpenAI)** — Three-panel layout (sidebar + conversation + diff review). Thread-per-task model. `Cmd+K` command palette + `/` slash commands + `$` skill invocation. Worktree isolation at thread creation time. Pop-out windows for threads. Inline diff review with per-chunk staging and inline comments. Approval flow (approve once / approve for session / reject). Automations with Triage inbox. Cross-surface sync (CLI ↔ IDE ↔ app share config). Custom action buttons pinned to header. Personality modes. Notification system.
+
+**Antigravity (Google)** — Dual-window architecture: Editor View (VS Code fork with agent sidebar) and Agent Manager View (three-column mission control). The Agent Manager uses an **inbox metaphor** — Workspaces | Inbox | Conversation. Each agent task is a thread in the inbox with status badges (Idle/Running/Blocked). Artifacts as first-class objects (plans, diffs, screenshots, browser recordings). Google Docs-style inline comments on agent output. Per-task model switching. Development mode presets (Agent-driven / Agent-assisted / Review-driven). Up to 5 parallel agents. `Cmd+E` toggles between editor and manager.
+
+### Key Patterns We Adopt
+
+| Pattern | Source | Our Implementation |
+|---------|--------|--------------------|
+| **Sidebar tree as sole navigation** | VS Code explorer | No tabs, no header toggle. One persistent sidebar tree controls everything. Clicking a node changes the content pane. Tree sections expand/collapse. |
+| **Inbox metaphor for sessions** | Antigravity | Sessions section in the sidebar tree. Each session is a node with status badge. Clicking opens it in the content pane. |
+| **Three-panel working view** | Codex | When a session is selected: content pane splits into conversation + review panel. The sidebar tree stays. |
+| **Thread-per-task** | Codex | Each session is one task, one conversation. Parallel sessions listed in tree. |
+| **Inline diff review** | Codex | Review panel shows git diff with syntax highlighting, per-file/chunk staging, inline comments. Diff scope: unstaged / staged / all branch / last turn. |
+| **Command surfaces (3 layers)** | Codex | `Cmd+K` palette (all commands, fuzzy search) + `/` slash commands in composer + landing view action grid (featured + heuristic ranked). |
+| **Artifacts panel** | Antigravity | Plans, diffs, research docs, verification results — surfaced as reviewable objects in the review panel. Not buried in chat. |
+| **Status badges** | Antigravity | Every session node in the tree shows: Idle / Running / Blocked / Completed. Color-coded. Scannable at a glance. |
+| **Development mode presets** | Antigravity | Adapter-level autonomy settings: Autonomous (agent decides everything) / Assisted (agent pauses at checkpoints) / Supervised (approve every action). Maps to our approval flow. |
+| **Approval flow** | Codex | When an agent needs confirmation: inline buttons (Approve / Approve for session / Reject). Rendered as `ChatElementContract` type `confirm`. |
+| **Custom action buttons** | Codex | Adapter-provided `featured` commands render as action buttons in the session header. Quick access to frequent actions without palette. |
+| **Pop-out sessions** | Codex | Any session can be popped out to a separate browser window (or Tauri window in desktop mode). Always-on-top option. Good for monitoring while using another editor. |
+| **Inline comments on agent output** | Antigravity | Select text in a plan or diff → leave a comment → agent incorporates feedback. More precise than chat-based correction. |
+| **Per-session model selection** | Antigravity | When creating a session, pick the model (if the adapter supports multiple). Different sessions can use different models simultaneously. |
+| **Automations / Triage inbox** | Codex | Future: scheduled tasks that run agents on triggers. Results land in a triage sub-section in the tree for review. |
+
+### What We Don't Adopt
+
+| Pattern | Source | Why Not |
+|---------|--------|---------|
+| Separate windows for editor/manager | Antigravity | We're not an IDE. Single app, sidebar tree drives navigation. |
+| Tabbed/header view switching | Codex | No tabs. All navigation via sidebar tree. Content pane adapts to selection. |
+| VS Code fork / integrated editor | Antigravity | We're editor-agnostic. The user's editor is external. We show diffs and artifacts, not a full editor. |
+| Browser sub-agent with video recordings | Antigravity | Scope creep. Future consideration, not Phase 2-5. |
+| Personality modes (Pragmatic/Friendly) | Codex | The agent's personality is the agent's business. Our shell doesn't impose personality on agents. |
+| Cloud execution target | Codex | We're local-first. Cloud agents connect via adapters, but we don't provision cloud sandboxes. |
+
+### Layout Architecture
+
+**No tabs. No header view toggle. The sidebar tree is the sole navigation mechanism.** The app is always: sidebar tree (left) + content pane (right). What's in the content pane depends entirely on what's selected in the tree.
+
+```
+┌──────────────────┬─────────────────────────────────────────────────┐
+│  Sidebar Tree     │  Content Pane                                   │
+│                    │  (adapts to tree selection)                     │
+│  ┌──────────────┐ │                                                 │
+│  │ [+] [Cmd+K]  │ │  Landing / Session / Kanban / Settings / ...   │
+│  ├──────────────┤ │                                                 │
+│  │ ▸ Sessions   │ │                                                 │
+│  │   ● auth-fix │ │                                                 │
+│  │   ○ tests    │ │                                                 │
+│  │   ◉ review   │ │                                                 │
+│  │   ✓ refactor │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Board      │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Adapters   │ │                                                 │
+│  │   Claude CLI │ │                                                 │
+│  │   Claude ACP │ │                                                 │
+│  │              │ │                                                 │
+│  │ ▸ Projects   │ │                                                 │
+│  │   agent-mgr  │ │                                                 │
+│  │   website    │ │                                                 │
+│  │              │ │                                                 │
+│  │ ─────────    │ │                                                 │
+│  │ ⚙ Settings   │ │                                                 │
+│  └──────────────┘ │                                                 │
+│  ┌──────────────┐ │                                                 │
+│  │ Status Bar   │ │                                                 │
+│  └──────────────┘ │                                                 │
+└──────────────────┴─────────────────────────────────────────────────┘
+```
+
+#### Sidebar Tree Structure
+
+The sidebar tree has a fixed set of top-level sections. Each section expands to show its children. Clicking any leaf node changes the content pane.
+
+```
+[+] New Session     [Cmd+K]
+──────────────────────────────
+▾ Sessions                          ← always expanded by default
+  ● Fix auth bug          2m  $0.42 ← status dot + title + time + cost
+  ◉ Review PR #42        12m  $1.80 ← yellow = blocked (needs input)
+  ○ Add test coverage      —  $0.00 ← gray = idle
+  ✓ Refactor DB          38m  $3.20 ← blue = completed
+  ✓ Update deps           5m  $0.60
+  ··· Show archived (12)            ← collapsed by default
+
+▾ Board                             ← kanban view
+  (no children — clicking "Board" opens kanban in content pane)
+
+▸ Adapters                          ← collapsed by default
+  Claude CLI        ✓ connected
+  Claude ACP        ✓ connected
+  GSD               ○ not configured
+
+▸ Projects                          ← collapsed by default
+  agent-manager     3 sessions
+  website           1 session
+
+▸ MCPs                              ← only if adapters have MCPs
+  filesystem        ✓ running
+  github            ✓ running
+
+──────────────────────────────
+⚙ Settings
+```
+
+**Tree sections are capability-driven.** If no adapter declares MCP support, the "MCPs" section doesn't appear. If no adapter declares hooks, no "Hooks" section. The tree reflects what's actually available (per Q9 resolution).
+
+**Tree node types and what they render in the content pane:**
+
+| Tree Node | Content Pane |
+|-----------|-------------|
+| Nothing selected (app start) | **Landing view** — prompt input, action grid, recent sessions |
+| `Sessions` header | **Session inbox** — filterable list with detail panel |
+| A specific session | **Session view** — conversation + review panel (split) |
+| `Board` | **Kanban board** — drag-and-drop columns |
+| `Adapters` header | **Adapters overview** — card grid of all adapters with status |
+| A specific adapter | **Adapter detail** — capabilities, auth config, sessions using it |
+| `Projects` header | **Projects overview** — project list with session counts |
+| A specific project | **Project detail** — sessions scoped to that project |
+| `MCPs` header | **MCP browser** — all MCP servers with tools list |
+| A specific MCP | **MCP detail** — tools, status, configuration |
+| `Settings` | **Settings** — categorized settings panels |
+
+#### Sidebar Header
+
+The sidebar header has two persistent actions:
+
+- **[+] New Session** — opens the session creation flow in the content pane (adapter picker + prompt input + model selector).
+- **[Cmd+K]** — opens the command palette overlay.
+
+#### Content Pane: Landing View (nothing selected)
+
+On app start, or when no specific node is selected:
+
+```
+┌────────────────────────────────────────────────────┐
+│                                                      │
+│          What would you like to work on?            │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ > Describe your task...           [Claude ▾]  │   │
+│  └──────────────────────────────────────────────┘   │
+│                                                      │
+│  Suggested actions:                                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ /commit  │ │ /review  │ │ Run tests│            │
+│  └──────────┘ └──────────┘ └──────────┘            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ /init    │ │ Fix bug  │ │ Refactor │            │
+│  └──────────┘ └──────────┘ └──────────┘            │
+│                                    [Show all →]     │
+│                                                      │
+│  Recent sessions:                                    │
+│  ─ Fix auth bug (2m ago, $0.42)                     │
+│  ─ Add test coverage (1h ago, $1.20)                │
+│                                                      │
+└────────────────────────────────────────────────────┘
+```
+
+- **Prompt input** with adapter selector dropdown.
+- **Suggested actions** grid: `featured` commands + heuristic-ranked.
+- **Recent sessions** list (clickable — selects in sidebar tree).
+
+#### Content Pane: Session View (session selected)
+
+When a session node is clicked in the tree, the content pane splits:
+
+```
+┌────────────────────────────────────┬──────────────────────┐
+│  Conversation / Stream             │  Review Panel        │
+│                                    │                      │
+│  ┌──────────────────────────────┐  │  ┌ Diff ──────────┐ │
+│  │ Agent: Analyzing the auth    │  │  │ src/auth.ts    │ │
+│  │ module...                    │  │  │  +import {...} │ │
+│  │                              │  │  │  -old code     │ │
+│  │ [Tool Call] Read file        │  │  │  +new code     │ │
+│  │ src/auth.ts                  │  │  │                │ │
+│  │                              │  │  │ [Stage] [Revert│ │
+│  │ [Approval Request]           │  │  └────────────────┘ │
+│  │ Run `npm test`?              │  │                      │
+│  │ [Approve] [Approve All]      │  │  ┌ Artifacts ────┐  │
+│  │ [Reject]                     │  │  │ Plan (2/5)     │  │
+│  │                              │  │  │ Research doc   │  │
+│  └──────────────────────────────┘  │  └────────────────┘  │
+│                                    │                      │
+│  ┌──────────────────────────────┐  │  Scope: [Unstaged ▾] │
+│  │ > prompt input...  [/] [📎]  │  │  [Stage All] [Revert]│
+│  └──────────────────────────────┘  │                      │
+└────────────────────────────────────┴──────────────────────┘
+```
+
+- **Left: Conversation.** Chat messages + tool calls + approval prompts + inline interactive elements. Composer at bottom with `/` slash commands. Streamed real-time via AG-UI events.
+- **Right: Review panel.** Diff viewer (syntax highlighted, per-file staging, inline comments) + artifacts list. Scope selector (unstaged / staged / all branch / last turn). **Collapsible** via `Cmd+\`.
+
+The sidebar tree stays visible on the left — so the full layout is: **sidebar tree | conversation | review panel**. The tree provides instant session switching without leaving the current view.
+
+#### Content Pane: Session Inbox (Sessions header selected)
+
+When the "Sessions" section header itself is clicked (not a specific session):
+
+```
+┌────────────────────────────┬──────────────────────────────────┐
+│  Session List (filterable) │  Selected Session Detail          │
+│                            │                                    │
+│  Filter: [All ▾] [🔍]     │  Session: "Fix auth bug"           │
+│                            │  Adapter: Claude CLI               │
+│  ┌──────────────────────┐  │  Status: ● Running                 │
+│  │ ● Fix auth bug  2m   │  │  Model: Opus 4.6                   │
+│  │   Claude CLI  $0.42  │  │  Cost: $0.42                       │
+│  ├──────────────────────┤  │  Duration: 2m                      │
+│  │ ◉ Review PR   12m   │  │                                    │
+│  │   Claude CLI  $1.80  │  │  ┌─ Artifacts ──────────────────┐  │
+│  ├──────────────────────┤  │  │  Plan (3 steps, 2 complete)  │  │
+│  │ ○ Add tests    —    │  │  │  Diff (+42 / -12)            │  │
+│  │   Claude ACP  $0.00  │  │  │  Verification: ✓ pass        │  │
+│  ├──────────────────────┤  │  └──────────────────────────────┘  │
+│  │ ✓ Refactor   38m    │  │                                    │
+│  │   GSD        $3.20   │  │  [Open Session] [Pop Out]         │
+│  └──────────────────────┘  │  [Archive]                         │
+└────────────────────────────┴──────────────────────────────────┘
+```
+
+Two-column inbox: filterable session list (left) + detail (right). "Open Session" selects the session in the tree, switching to the full session view.
+
+#### Content Pane: Kanban Board (Board selected)
+
+```
+┌──────────────┬──────────────┬──────────────┬──────────────┐
+│   Backlog    │  In Progress │  In Review   │    Done      │
+│              │              │              │              │
+│  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │  ┌────────┐  │
+│  │Task    │  │  │Task    │  │  │Task    │  │  │Task    │  │
+│  │Card    │  │  │Card    │  │  │Card    │  │  │Card    │  │
+│  └────────┘  │  └────────┘  │  └────────┘  │  └────────┘  │
+│              │              │              │              │
+└──────────────┴──────────────┴──────────────┴──────────────┘
+```
+
+Drag-and-drop task cards. Cards show: title, adapter icon, status badge, cost, linked session. Clicking a card selects the session in the tree.
+
+#### Content Pane: Settings (Settings selected)
+
+Organized by category:
+
+| Section | Contents |
+|---------|----------|
+| **General** | Default adapter, default model, working directory, notification preferences |
+| **Adapters** | Registered adapters list. Per-adapter: auth config (from `AuthConfig`), capabilities view, enable/disable. "Add adapter" flow. |
+| **Appearance** | Theme (dark/light/auto), UI font, code font, accent color |
+| **Git** | Branch naming pattern, force push toggle, commit message template, PR description template |
+| **MCP** | Enabled MCP servers, add custom servers, per-server auth |
+| **Autonomy** | Default development mode preset (Autonomous / Assisted / Supervised). Per-adapter overrides. |
+| **Keyboard** | Shortcut customization |
+| **Advanced** | Feature flags, debug mode, data export |
+
+#### Status Bar
+
+Persistent at the bottom of the sidebar (not full-width):
+- Connection status (WS connected/disconnected)
+- Active agent count (e.g., "2 running")
+- Total session cost
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+K` | Command palette (all commands, fuzzy search) |
+| `Cmd+N` | New session |
+| `Cmd+Enter` | Send prompt (configurable) |
+| `Cmd+\` | Toggle review panel |
+| `Cmd+B` | Toggle sidebar tree |
+| `Cmd+J` | Toggle terminal panel (within session) |
+| `Cmd+,` | Settings (selects Settings in tree) |
+| `/` | Slash command (in composer, when focused) |
+| `Esc` | Close palette/dialog/panel |
+| `Up/Down` | Navigate tree nodes or command palette |
+| `Enter` | Expand/select tree node |
+| `Left/Right` | Collapse/expand tree section |
+
+### Responsive Behavior
+
+| Breakpoint | Layout |
+|-----------|--------|
+| **Desktop (≥1280px)** | Sidebar tree + content pane (which may split into conversation + review). All visible. Resizable dividers. |
+| **Tablet (768-1279px)** | Sidebar collapses to icon rail (section icons only, expands on hover/click). Review panel becomes a slide-over drawer triggered by `Cmd+\`. |
+| **Mobile (<768px)** | Sidebar becomes a slide-out drawer (hamburger icon). Content pane is full-screen. Review panel is a bottom sheet. Navigation via drawer + swipe gestures. |
+
+### Component Mapping
+
+| UI Component | Contract/Data Source | Content Pane |
+|-------------|---------------------|-------------|
+| Sidebar tree | All stores (sessions, adapters, projects, MCPs) | Always visible (left) |
+| Landing view | `CommandContract[]` (featured) + recent sessions | Nothing selected |
+| Session inbox | `Session[]` filterable list | Sessions header selected |
+| Conversation thread | `AgentEvent[]` stream | Session selected (left split) |
+| Diff viewer | Git diff + `WorktreeContract` | Session selected (review panel) |
+| Artifacts list | `ResearchDocContract[]` + `TaskContract[]` | Session selected (review panel) |
+| Command palette | `CommandContract[]` from `adaptersStore` | Global overlay (`Cmd+K`) |
+| Action grid | `CommandContract[]` where `featured: true` + heuristic ranked | Landing view |
+| Approval prompt | `ChatElementContract` type `confirm` | Session conversation (inline) |
+| Task card (kanban) | `TaskContract` | Board selected |
+| Adapter overview | `AdapterManifest[]` + `AuthConfig[]` | Adapters header selected |
+| Adapter detail | `AdapterManifest` + `AgentCapabilities` | Specific adapter selected |
+| MCP browser | `McpContract[]` | MCPs header selected |
+| Settings panels | Config stores | Settings selected |
+
+### Content Pane Summary
+
+| Tree Selection | Content Pane Renders |
+|---------------|---------------------|
+| Nothing (app start) | Landing: prompt input + action grid + recent sessions |
+| Sessions header | Inbox: filterable list + detail panel |
+| Specific session | Session: conversation (left) + review panel (right, collapsible) |
+| Board | Kanban: drag-and-drop columns |
+| Adapters header | Grid of adapter cards with status |
+| Specific adapter | Adapter config: capabilities, auth, sessions |
+| Projects header | Project list with session counts |
+| Specific project | Sessions scoped to project |
+| MCPs header | MCP browser: servers + tools |
+| Specific MCP | MCP detail: tools, status, config |
+| Settings | Categorized settings panels |
+
+The `prototype/` directory (14 variants, 92 screenshot tests) is preserved as design reference. The real app uses the sidebar-tree + content-pane model. Prototype Ops/Kanban/Brief designs inform the content pane renderers.
+
+## Open Questions
+
+### Architecture & Protocol
+
+1. **ACP client implementation timing.** ~~We chose Option 2 (ACP + our extensions) as the strategy. When do we prototype our ACP client? Do we build it as a generic adapter that wraps any ACP agent, or replace our adapter interface entirely with ACP types? The risk: building too much custom adapter code now that we later throw away once ACP is the transport.~~
+
+   **RESOLVED:** ACP is an adapter, not a replacement for our adapter interface. See "Protocol Layering Resolution" below.
+
+2. **ACP ↔ CommandContract bridging.** ~~Our `invocation` field (immediate/prompt/form) is a richer superset of ACP's `AvailableCommand.input?`. When we receive `AvailableCommandsUpdate` from an ACP agent, how do we map? Proposal: `input` absent → `immediate`, `input` present → `prompt` with `hint`. But ACP has no equivalent to our `form` kind — is that only for our own adapters?~~
+
+   **RESOLVED:** The ACP adapter normalizes on ingest. See mapping table below.
+
+3. **ACP Registry vs. our adapter registry.** ~~The ACP Registry (live in Zed + JetBrains) solves agent discovery. Should we consume it directly? Or maintain our own registry that can pull from ACP Registry as one source among others (for non-ACP agents like GSD, MetaMorph)?~~
+
+   **RESOLVED:** Standards-first. Use ACP Registry as the primary discovery source for ACP-compatible agents. Our `AdapterRegistry` wraps it: ACP Registry provides the catalog of available agents; our registry adds non-ACP agents (GSD, MetaMorph, custom) alongside them. The UI shows one unified list — the user doesn't need to know whether an agent was discovered via ACP Registry or registered locally. Implementation: the `AcpAdapter` fetches from the ACP Registry at startup (or on user request), creates adapter entries for each discovered agent, and registers them alongside native adapters.
+
+4. **AG-UI ↔ ACP event mapping.** ~~We plan to use AG-UI as our internal event wire format. ACP has its own streaming events. If we're an ACP client, we receive ACP events — do we normalize ACP → AG-UI → UI? Or does ACP replace AG-UI as our wire format? This is a two-protocol-or-one decision.~~
+
+   **RESOLVED:** ACP and AG-UI operate at different layers. They don't compete. See resolution below.
+
+### Authentication & Billing
+
+5. **Claude auth path: CLI vs SDK.** ~~Our adapter uses CLI wrapping (`claude --output-format stream-json`), which supports subscription auth natively. The ACP adapter uses the SDK. If we're also an ACP client, we'd receive Claude's events via ACP (SDK path). Do we maintain both? Do we prefer one? The CLI path is better for subscription users; the ACP/SDK path is better for ecosystem compatibility.~~
+
+   **RESOLVED:** Both paths coexist. See resolution below.
+
+6. **OAuth for personal use.** ~~The Claude Agent SDK technically supports OAuth via `CLAUDE_CODE_OAUTH_TOKEN` for individual use, but Anthropic officially says SDK = API key only. If a user sets up OAuth personally, it works. Do we document this as a supported path? Or acknowledge it as "works but unsupported"? Risk: Anthropic could break it at any time.~~
+
+   **RESOLVED:** Don't document it. Don't endorse it. Our primary Claude adapter wraps the CLI, which supports subscription auth natively — no need to push users toward the SDK OAuth workaround. If a user configures `CLAUDE_CODE_OAUTH_TOKEN` themselves, it'll work because the CLI respects it, but we don't mention it in our docs or UI. Avoids any ToS issues if we open-source later.
+
+7. **Auth method declaration in AdapterManifest.** ~~We noted the manifest should declare supported auth methods. What's the schema?~~
+
+   **RESOLVED:** Keep it simple — the adapter declares what auth it needs, the shell renders the appropriate setup UI. Schema:
+
+   ```typescript
+   interface AuthConfig {
+     methods: ('api_key' | 'oauth_browser' | 'token' | 'none')[];
+     // Per-method hints for the settings UI
+     apiKey?: { envVar: string; consoleUrl?: string; label?: string };
+     oauthBrowser?: { loginCommand: string; label?: string };  // e.g. "claude login"
+     token?: { envVar: string; setupCommand?: string; label?: string };
+   }
+   ```
+
+   This lives on `AdapterManifest.auth`. The Claude CLI adapter declares `methods: ['oauth_browser', 'api_key']` with `oauthBrowser: { loginCommand: 'claude login' }`. The ACP adapter for a generic agent declares whatever auth the underlying agent requires. The settings UI reads `auth.methods` and renders the appropriate configuration form (API key input field, "open browser" button, token paste field, or nothing).
+
+### UI & UX
+
+8. **Context-aware suggestions model & billing.** ~~The v2 LLM-powered action suggestion system needs its own model call. Which model? Whose API key? Is it the same key as the agent's? Or a separate "shell intelligence" key? If the user only has a Claude subscription (no API key), can we still offer suggestions?~~
+
+   **RESOLVED:** No paid API calls for suggestions. The shell must never cost money to use beyond the agent's own usage. Strategy (layered, cheapest first):
+
+   1. **v1: Heuristic ranking (free).** No LLM needed. Rank commands by: recency of use, frequency, context signals (e.g., if git status shows uncommitted files → boost `/commit`; if session just ended → boost `/review-pr`). Simple rules, zero cost.
+   2. **v2: Local model (free).** If a local model is available (Ollama, llama.cpp, MLX), use it for context-aware suggestions. The shell detects local inference endpoints and uses them opportunistically.
+   3. **v3: Piggyback on the agent's model (free to the shell).** If the user has an active agent session, the shell can append a lightweight "suggest next actions" prompt to the agent's next turn. The suggestion comes back as part of the agent's normal response — no extra API call.
+
+   This works for private use AND open source — nobody pays extra for shell intelligence. The heuristic approach (v1) covers 80% of the value. Local models and piggybacking are nice-to-haves.
+
+9. **Feature parity communication.** ~~Tier 2 ACP adapters (SDK wrappers like claude-code-acp) don't support all features — no hooks, missing slash commands, partial Plan mode. How do we communicate this in the UI?~~
+
+   **RESOLVED:** The `AgentCapabilities` system already handles this. Each adapter declares what it supports (`commands: true`, `hooks: false`, etc.). The sidebar nav tree only shows sections for supported capabilities. This means:
+
+   - Claude via CLI adapter → full nav (Sessions, Skills, Commands, MCPs, Hooks, Worktrees)
+   - Claude via ACP adapter → reduced nav (Sessions, Commands — no Hooks, fewer slash commands)
+   - A minimal agent → just Sessions
+
+   No warnings, no grayed-out sections, no "some features unavailable" banners. The UI simply shows what's available. If a user switches from CLI adapter to ACP adapter, they see fewer sections — that's self-explanatory. The adapter picker in settings can show a capabilities comparison to help users choose. Honest UI > apologetic UI.
+
+10. **Command palette vs. landing view actions.** ~~Commands appear in two places: the command palette (Cmd+K) and the landing view action grid. Are they the same data source?~~
+
+    **RESOLVED:** Same data source, different views.
+
+    - **Data source:** `adaptersStore.commands[]` — the unified list of all discovered commands across all adapters.
+    - **Command palette (Cmd+K):** Shows ALL commands, flat list, fuzzy-searchable. Every command from every adapter, grouped by adapter. This is the power-user interface — you know what you want, you search for it.
+    - **Landing view action grid:** Shows a CURATED subset. The curation logic: (1) Adapter-provided `featured` flag on commands. (2) The heuristic ranker from Q8 (frequent/recent/context-relevant). (3) Max ~6-9 visible actions to avoid overwhelming. (4) "Show all" link opens command palette.
+
+    Same commands, different presentation. The palette is the exhaustive index; the landing view is the smart suggestion surface.
+
+### Ecosystem
+
+11. **Non-ACP agents.** ~~Some agents we want to support (GSD, MetaMorph, custom CLI tools) don't speak ACP. Our adapter interface handles these. But if ACP becomes our primary transport, these become second-class citizens. How do we ensure parity?~~
+
+    **RESOLVED:** Our adapter interface IS the abstraction. ACP is one adapter implementation among many. See resolution below.
+
+12. **ACP version compatibility.** ~~ACP is evolving (v0.14.x currently). How do we handle breaking changes? Do we pin to a specific ACP version? Support multiple versions? The TypeScript SDK publishes frequently.~~
+
+    **RESOLVED:** Pin to latest stable at time of AcpAdapter implementation (Phase 6). ACP follows semver — minor versions add features, patches fix bugs. Our `AcpAdapter` depends on `@agentclientprotocol/sdk` as a regular npm dependency with a caret range (`^0.14.x`). If ACP ships a breaking major version bump, we add a new adapter version and keep the old one for backwards compat — same pattern as any npm dependency. Don't overthink this until we actually build the adapter; the SDK is still pre-1.0 and may stabilize by then.
+
+13. **Multi-agent with mixed ACP/non-ACP.** ~~If Claude runs via ACP and GSD runs via our native adapter, can they coexist in the same session?~~
+
+    **RESOLVED:** Yes. All adapters emit `AgentEvent` regardless of their transport. The event bus doesn't care about the source protocol. See resolution below.
+
+---
+
+### Protocol Layering Resolution (Q1, Q2, Q4, Q5, Q11, Q13)
+
+**The key insight:** ACP and AG-UI operate at **different layers** and don't compete. They complement each other.
+
+```
+Layer comparison:
+
+ACP (Zed)                              AG-UI (CopilotKit)
+─────────                              ──────────────────
+Session management (init, modes)       Run lifecycle (start/end)
+Bidirectional (client ↔ agent)         Unidirectional (agent → frontend)
+JSON-RPC 2.0 transport                 Transport-agnostic (SSE, WS, etc.)
+Slash commands, file ops, terminals    Text/tool streaming, state sync
+Editor↔agent communication             Agent↔frontend communication
+```
+
+ACP is a **session/transport protocol** (how to talk to an agent). AG-UI is a **streaming event protocol** (how agent output reaches the UI). They sit at different levels:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  UI Layer                                                  │
+│  React components bind to AgentEvent (our type)            │
+│  which is AG-UI-aligned                                    │
+└──────────────────────┬─────────────────────────────────────┘
+                       │ AgentEvent (10 types, AG-UI-aligned)
+┌──────────────────────▼─────────────────────────────────────┐
+│  Event Bus                                                 │
+│  All adapters normalize to AgentEvent                      │
+└──────┬───────────────┬──────────────────┬──────────────────┘
+       │               │                  │
+┌──────▼──────┐ ┌──────▼──────┐ ┌────────▼────────┐
+│ ACP Adapter │ │ CLI Adapter │ │ SDK Adapter     │
+│ (generic)   │ │ (claude)    │ │ (future agents) │
+│             │ │             │ │                 │
+│ Speaks ACP  │ │ Parses      │ │ Uses native     │
+│ JSON-RPC    │ │ stream-json │ │ SDK callbacks   │
+│ to any ACP  │ │ from claude │ │                 │
+│ agent       │ │ binary      │ │                 │
+└──────┬──────┘ └──────┬──────┘ └────────┬────────┘
+       │               │                  │
+  ACP agents       claude CLI         SDK agents
+  (25+ agents)   (subscription OK)    (API key)
+```
+
+**Decision: Our adapter interface IS the abstraction layer. ACP is one adapter.**
+
+| Question | Resolution |
+|----------|-----------|
+| **Q1: ACP timing** | Build a generic `AcpAdapter` as Phase 6 work (Multi-Agent). It implements our `Adapter` interface by acting as an ACP client. Any ACP agent gets automatic support. No need to rush — our CLI adapter handles Claude today. |
+| **Q2: ACP → CommandContract** | The `AcpAdapter` maps `AvailableCommand` to `CommandContract` on ingest. Mapping: `input` absent → `invocation: undefined` (immediate). `input.hint` present → `invocation: { kind: 'prompt', hint }`. `form` kind is our own extension for adapters that provide richer parameter metadata — ACP agents won't use it unless we extend ACP. |
+| **Q4: AG-UI vs ACP events** | Not competing. ACP `SessionUpdate` events normalize to our `AgentEvent` types (which are AG-UI-aligned). The mapping: `agent_message_chunk` → `text_delta`. `agent_thought_chunk` → `thinking`. `tool_call` → `tool_call` + `tool_result`. `usage_update` → `cost_update`. `plan` → future `plan_update` event. `available_commands_update` → updates adapter's command registry (not an AgentEvent — it's metadata). |
+| **Q5: CLI vs SDK for Claude** | Both coexist as separate adapters. `claude-cli` adapter (CLI wrapping) = primary for subscription users. `acp-claude` adapter (via generic `AcpAdapter`) = available for users who prefer the ACP ecosystem path. User picks in adapter settings. No conflict — they're two adapters for the same underlying agent. |
+| **Q11: Non-ACP agents** | First-class. GSD, MetaMorph, custom tools get native adapters that implement the same `Adapter` interface. The `AcpAdapter` is just one adapter among many. Non-ACP agents are never second-class because the abstraction is at OUR layer, not ACP's. |
+| **Q13: Mixed sessions** | Works naturally. Each adapter emits `AgentEvent` regardless of its transport. The event bus doesn't know or care whether the event originated from ACP JSON-RPC, CLI stdout parsing, or SDK callbacks. Same types, same UI. |
+
+**ACP SessionUpdate → AgentEvent mapping:**
+
+| ACP SessionUpdate | AgentEvent | Notes |
+|-------------------|-----------|-------|
+| `agent_message_chunk` | `text_delta` | ContentChunk text → delta text |
+| `agent_thought_chunk` | `thinking` | Reasoning/planning content |
+| `tool_call` (status: running) | `tool_call` | Initial invocation with input |
+| `tool_call_update` (status: completed) | `tool_result` | Output + success/error |
+| `usage_update` | `cost_update` | Token counts, optional cost |
+| `plan` | *(new event needed)* | Plan entries with status — consider adding `plan_update` to AgentEvent |
+| `available_commands_update` | *(metadata, not event)* | Updates adapter's command registry, triggers UI re-render |
+| `current_mode_update` | *(metadata)* | Updates session mode state |
+| `session_info_update` | *(metadata)* | Updates session title/metadata |
+| Session init response | `session_start` | Model, capabilities, cwd |
+| Session end | `session_end` | Result, cost, duration |
+
+**What this means for implementation priority:**
+
+1. **Now (Phase 2-4):** Build on the CLI adapter. It works, it supports subscriptions, it's implemented.
+2. **Phase 6:** Build the generic `AcpAdapter` as one `Adapter` implementation. Instantly supports 25+ agents.
+3. **Never:** Replace our adapter interface with ACP. Our interface is the abstraction; ACP is a transport.
